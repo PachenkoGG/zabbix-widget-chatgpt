@@ -273,18 +273,14 @@ class ZabbixAPIProvider
             foreach ($hosts as $host) {
                 $metrics = [];
                 
-                // Get items directly for this host (not through selectItems)
+                // Get ALL items for this host (no search filter for comprehensive data)
                 $items = $this->apiRequest('item.get', [
-                    'output' => ['itemid', 'name', 'key_', 'lastvalue', 'units'],
+                    'output' => ['itemid', 'name', 'key_', 'lastvalue', 'units', 'value_type'],
                     'hostids' => $host['hostid'],
                     'monitored' => true,
-                    'search' => [
-                        'key_' => ['cpu', 'memory', 'vfs.fs', 'net']
-                    ],
-                    'searchByAny' => true,
                     'sortfield' => 'name',
-                'limit' => 100
-            ]);
+                    'limit' => 200  // Increased for more comprehensive data
+                ]);
             
             // Collect candidate metrics
             $diskCandidates = [];
@@ -299,11 +295,11 @@ class ZabbixAPIProvider
                     $diskCandidates[] = $item;
                 }
                     
-                // Match CPU metrics
-                if (!isset($metrics['cpu'])) {
+                // Match CPU utilization metrics
+                if (!isset($metrics['cpu_usage'])) {
                     if (stripos($key, 'cpu') !== false || stripos($name, 'cpu') !== false) {
                         if (stripos($name, 'utilization') !== false || stripos($name, 'usage') !== false) {
-                            $metrics['cpu'] = [
+                            $metrics['cpu_usage'] = [
                                 'itemid' => $item['itemid'],
                                 'name' => $item['name'],
                                 'value' => $item['lastvalue'],
@@ -313,19 +309,79 @@ class ZabbixAPIProvider
                     }
                 }
                 
-                // Match Memory metrics
-                if (!isset($metrics['memory'])) {
+                // Match CPU core count
+                if (!isset($metrics['cpu_cores'])) {
+                    if (stripos($key, 'system.cpu.num') !== false || 
+                        stripos($name, 'number of cpus') !== false ||
+                        stripos($name, 'number of processors') !== false ||
+                        stripos($name, 'processor count') !== false) {
+                        $metrics['cpu_cores'] = [
+                            'itemid' => $item['itemid'],
+                            'name' => $item['name'],
+                            'value' => $item['lastvalue'],
+                            'units' => $item['units']
+                        ];
+                    }
+                }
+                
+                // Match Memory utilization
+                if (!isset($metrics['memory_usage'])) {
                     if (stripos($key, 'memory') !== false || stripos($name, 'memory') !== false || stripos($name, 'ram') !== false) {
                         if (stripos($name, 'utilization') !== false || 
                             stripos($name, 'usage') !== false ||
                             (stripos($name, 'used') !== false && stripos($name, 'percent') !== false)) {
-                            $metrics['memory'] = [
+                            $metrics['memory_usage'] = [
                                 'itemid' => $item['itemid'],
                                 'name' => $item['name'],
                                 'value' => $item['lastvalue'],
                                 'units' => $item['units']
                             ];
                         }
+                    }
+                }
+                
+                // Match Total Memory
+                if (!isset($metrics['memory_total'])) {
+                    if ((stripos($key, 'vm.memory.size[total]') !== false || 
+                         stripos($key, 'vm.memory.size[available]') !== false ||
+                         stripos($name, 'total memory') !== false ||
+                         stripos($name, 'available memory') !== false) &&
+                        stripos($name, 'utilization') === false) {
+                        $metrics['memory_total'] = [
+                            'itemid' => $item['itemid'],
+                            'name' => $item['name'],
+                            'value' => $item['lastvalue'],
+                            'units' => $item['units']
+                        ];
+                    }
+                }
+                
+                // Match System Uptime
+                if (!isset($metrics['uptime'])) {
+                    if (stripos($key, 'system.uptime') !== false || 
+                        stripos($name, 'uptime') !== false ||
+                        stripos($name, 'system uptime') !== false) {
+                        $metrics['uptime'] = [
+                            'itemid' => $item['itemid'],
+                            'name' => $item['name'],
+                            'value' => $item['lastvalue'],
+                            'units' => $item['units']
+                        ];
+                    }
+                }
+                
+                // Match Operating System
+                if (!isset($metrics['os'])) {
+                    if (stripos($key, 'system.sw.os') !== false || 
+                        stripos($name, 'operating system') !== false ||
+                        stripos($name, 'os name') !== false ||
+                        stripos($name, 'system information') !== false) {
+                        $metrics['os'] = [
+                            'itemid' => $item['itemid'],
+                            'name' => $item['name'],
+                            'value' => $item['lastvalue'],
+                            'units' => $item['units']
+                        ];
                     }
                 }
                 
@@ -483,11 +539,22 @@ class ZabbixAPIProvider
                     
                     if (!empty($hostData['metrics'])) {
                         foreach ($hostData['metrics'] as $metricType => $metric) {
-                            $value = $this->formatMetricValue($metric['value'], $metric['units']);
+                            // Handle text values (like OS name) differently
+                            if ($metricType === 'os' || !is_numeric($metric['value'])) {
+                                $value = $metric['value']; // Don't format text values
+                            } else {
+                                $value = $this->formatMetricValue($metric['value'], $metric['units']);
+                            }
+                            
                             $context .= "   - {$metric['name']}: {$value}";
                             
-                            // Add history stats if available
-                            if (isset($metric['itemid'])) {
+                            // Add history stats ONLY for usage/utilization metrics (not for static info like CPU cores, RAM total, OS, uptime)
+                            $isUsageMetric = (stripos($metricType, 'usage') !== false || 
+                                             stripos($metricType, 'utilization') !== false ||
+                                             $metricType === 'disk' ||
+                                             $metricType === 'network');
+                            
+                            if ($isUsageMetric && isset($metric['itemid'])) {
                                 $stats = $this->getItemHistoryStats($metric['itemid'], 7200); // Last 2 hours
                                 if ($stats) {
                                     $minVal = $this->formatMetricValue($stats['min'], $metric['units']);
@@ -526,7 +593,23 @@ class ZabbixAPIProvider
      */
     private function formatMetricValue($value, $units) {
         if (empty($units)) {
+            // Check if value looks like uptime (large number of seconds)
+            if (is_numeric($value) && $value > 3600) {
+                // Probably uptime in seconds
+                $days = floor($value / 86400);
+                $hours = floor(($value % 86400) / 3600);
+                $minutes = floor(($value % 3600) / 60);
+                return "{$days} days, {$hours}h {$minutes}m";
+            }
             return number_format($value, 2);
+        }
+        
+        // Handle uptime in seconds ('s' or 'uptime')
+        if ($units === 's' || $units === 'uptime') {
+            $days = floor($value / 86400);
+            $hours = floor(($value % 86400) / 3600);
+            $minutes = floor(($value % 3600) / 60);
+            return "{$days} days, {$hours}h {$minutes}m";
         }
         
         // Handle percentage
