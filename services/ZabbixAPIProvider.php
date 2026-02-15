@@ -115,6 +115,137 @@ class ZabbixAPIProvider
     }
     
     /**
+     * Get host items (metrics) with latest data
+     */
+    public function getHostMetrics($hostName, $limit = 10) {
+        try {
+            // First, get the host
+            $hosts = $this->apiRequest('host.get', [
+                'output' => ['hostid', 'host', 'name'],
+                'filter' => ['host' => $hostName],
+                'limit' => 1
+            ]);
+            
+            if (empty($hosts)) {
+                // Try by name if exact host not found
+                $hosts = $this->apiRequest('host.get', [
+                    'output' => ['hostid', 'host', 'name'],
+                    'search' => ['name' => $hostName],
+                    'limit' => 1
+                ]);
+            }
+            
+            if (empty($hosts)) {
+                return ['error' => 'Host not found'];
+            }
+            
+            $hostId = $hosts[0]['hostid'];
+            
+            // Get items for this host (CPU, Memory, Disk, Network, etc.)
+            $items = $this->apiRequest('item.get', [
+                'output' => ['itemid', 'name', 'key_', 'lastvalue', 'units', 'value_type'],
+                'hostids' => $hostId,
+                'monitored' => true,
+                'filter' => [
+                    'value_type' => [0, 3] // Numeric (float and unsigned int)
+                ],
+                'sortfield' => 'name',
+                'limit' => $limit
+            ]);
+            
+            return [
+                'host' => $hosts[0],
+                'items' => $items
+            ];
+            
+        } catch (\Exception $e) {
+            error_log('ZabbixAPIProvider::getHostMetrics error: ' . $e->getMessage());
+            return ['error' => $e->getMessage()];
+        }
+    }
+    
+    /**
+     * Get specific item history
+     */
+    public function getItemHistory($itemId, $limit = 10) {
+        try {
+            $history = $this->apiRequest('history.get', [
+                'output' => 'extend',
+                'itemids' => $itemId,
+                'sortfield' => 'clock',
+                'sortorder' => 'DESC',
+                'limit' => $limit
+            ]);
+            
+            return $history;
+        } catch (\Exception $e) {
+            error_log('ZabbixAPIProvider::getItemHistory error: ' . $e->getMessage());
+            return [];
+        }
+    }
+    
+    /**
+     * Get top hosts by specific metric (CPU, Memory, etc.)
+     */
+    public function getTopHosts($limit = 10) {
+        try {
+            $hosts = $this->apiRequest('host.get', [
+                'output' => ['hostid', 'host', 'name'],
+                'monitored_hosts' => true,
+                'selectItems' => ['itemid', 'name', 'key_', 'lastvalue', 'units'],
+                'limit' => $limit
+            ]);
+            
+            // Get key metrics for each host
+            $hostsWithMetrics = [];
+            foreach ($hosts as $host) {
+                $metrics = [];
+                
+                foreach ($host['items'] as $item) {
+                    $key = $item['key_'];
+                    
+                    // Match common metrics
+                    if (stripos($key, 'cpu') !== false || stripos($item['name'], 'CPU') !== false) {
+                        $metrics['cpu'] = [
+                            'name' => $item['name'],
+                            'value' => $item['lastvalue'],
+                            'units' => $item['units']
+                        ];
+                    }
+                    elseif (stripos($key, 'memory') !== false || stripos($item['name'], 'Memory') !== false) {
+                        $metrics['memory'] = [
+                            'name' => $item['name'],
+                            'value' => $item['lastvalue'],
+                            'units' => $item['units']
+                        ];
+                    }
+                    elseif (stripos($key, 'disk') !== false || stripos($item['name'], 'Disk') !== false) {
+                        $metrics['disk'] = [
+                            'name' => $item['name'],
+                            'value' => $item['lastvalue'],
+                            'units' => $item['units']
+                        ];
+                    }
+                }
+                
+                if (!empty($metrics)) {
+                    $hostsWithMetrics[] = [
+                        'host' => $host['name'],
+                        'hostname' => $host['host'],
+                        'metrics' => $metrics
+                    ];
+                }
+            }
+            
+            return $hostsWithMetrics;
+            
+        } catch (\Exception $e) {
+            error_log('ZabbixAPIProvider::getTopHosts error: ' . $e->getMessage());
+            return [];
+        }
+    }
+    
+    /**
      * Get statistics
      */
     public function getStatistics() {
@@ -172,7 +303,7 @@ class ZabbixAPIProvider
             }
             
             $problems = $this->getProblems(10);
-            $hosts = $this->getHosts(10);
+            $hostsWithMetrics = $this->getTopHosts(15); // Get hosts with metrics
             
             $context = "=== CURRENT ZABBIX STATUS ===\n\n";
             
@@ -203,23 +334,27 @@ class ZabbixAPIProvider
                 $context .= "\n";
             }
             
-            // Monitored hosts
-            if (!empty($hosts)) {
-                $context .= "**Monitored Hosts (Sample):**\n";
-                foreach (array_slice($hosts, 0, 10) as $i => $host) {
-                    $hostName = $host['name'];
-                    $hostname = $host['host'];
-                    $groups = implode(', ', array_column($host['groups'] ?? [], 'name'));
+            // Hosts with current metrics
+            if (!empty($hostsWithMetrics)) {
+                $context .= "**Monitored Hosts with Current Metrics:**\n\n";
+                foreach ($hostsWithMetrics as $i => $hostData) {
+                    $context .= ($i + 1) . ". **{$hostData['host']}** ({$hostData['hostname']})\n";
                     
-                    $context .= ($i + 1) . ". {$hostName} ({$hostname})";
-                    if ($groups) {
-                        $context .= " - Groups: {$groups}";
+                    if (!empty($hostData['metrics'])) {
+                        foreach ($hostData['metrics'] as $metricType => $metric) {
+                            $value = $this->formatMetricValue($metric['value'], $metric['units']);
+                            $context .= "   - {$metric['name']}: {$value}\n";
+                        }
+                    } else {
+                        $context .= "   - No metrics available\n";
                     }
                     $context .= "\n";
                 }
             }
             
             $context .= "\n=== END ZABBIX STATUS ===\n";
+            $context .= "\nNote: You can answer questions about specific hosts, their metrics, problems, and overall infrastructure status.\n";
+            $context .= "If user asks for a specific host's metrics, tell them the available data above or that you need more specific information.\n";
             
             return $context;
             
@@ -227,6 +362,51 @@ class ZabbixAPIProvider
             error_log('ZabbixAPIProvider::formatForAI error: ' . $e->getMessage());
             return '';
         }
+    }
+    
+    /**
+     * Format metric value with units
+     */
+    private function formatMetricValue($value, $units) {
+        if (empty($units)) {
+            return number_format($value, 2);
+        }
+        
+        // Handle percentage
+        if ($units === '%') {
+            return number_format($value, 2) . '%';
+        }
+        
+        // Handle bytes
+        if (stripos($units, 'B') !== false || stripos($units, 'byte') !== false) {
+            $size = floatval($value);
+            $units_arr = ['B', 'KB', 'MB', 'GB', 'TB'];
+            $index = 0;
+            
+            while ($size >= 1024 && $index < count($units_arr) - 1) {
+                $size /= 1024;
+                $index++;
+            }
+            
+            return number_format($size, 2) . ' ' . $units_arr[$index];
+        }
+        
+        // Handle bits per second
+        if (stripos($units, 'bps') !== false) {
+            $speed = floatval($value);
+            $units_arr = ['bps', 'Kbps', 'Mbps', 'Gbps'];
+            $index = 0;
+            
+            while ($speed >= 1000 && $index < count($units_arr) - 1) {
+                $speed /= 1000;
+                $index++;
+            }
+            
+            return number_format($speed, 2) . ' ' . $units_arr[$index];
+        }
+        
+        // Default: value + units
+        return number_format($value, 2) . ' ' . $units;
     }
     
     /**
