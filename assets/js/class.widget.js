@@ -1,0 +1,306 @@
+/*
+** OpenAI Assistant Widget JavaScript
+** Advanced AI chat widget with multiple model support
+**/
+
+class CWidgetOpenAIAssistant extends CWidget {
+    apiToken = this._fields.token;
+    apiEndpoint = this._fields.endpoint;
+    selectedModel = this._fields.model;
+    temperature = parseFloat(this._fields.temperature) || 0.7;
+    topP = parseFloat(this._fields.top_p) || 1;
+    maxTokens = parseInt(this._fields.max_tokens) || 2048;
+    systemPrompt = this._fields.system_prompt || 'You are a helpful assistant.';
+    stream = this._fields.stream == 1;
+    
+    conversationHistory = [];
+    abort = false;
+
+    setContents(response) {
+        super.setContents(response);
+
+        this.sendButton = this._body.querySelector('[name=send-button]');
+        this.stopButton = this._body.querySelector('[name=stop-button]');
+        this.clearButton = this._body.querySelector('[name=clear-button]');
+        this.userInput = this._body.querySelector('.chat-form-message');
+        this.chatLog = this._body.querySelector('.chat-log');
+
+        this.userInput.addEventListener('keydown', e => {
+            if (e.code == 'Enter' || e.code == 'NumpadEnter') {
+                this.sendMessage();
+            }
+        });
+        
+        this.sendButton.addEventListener('click', this.sendMessage.bind(this));
+        this.stopButton.addEventListener('click', this.stopStream.bind(this));
+        this.clearButton.addEventListener('click', this.clearHistory.bind(this));
+        
+        // Load conversation history from localStorage
+        this.loadHistory();
+    }
+
+    async sendMessage() {
+        const question = this.userInput.value.trim();
+        this.userInput.value = '';
+
+        if (!question) {
+            return;
+        }
+
+        this.hideSendButton();
+        this.showStopButton();
+
+        this.stopController = new AbortController();
+
+        const questionElement = this.createMessage('user');
+        questionElement.innerHTML = marked.parse(question);
+
+        const answerElement = this.createMessage('bot');
+
+        // Add to conversation history
+        this.conversationHistory.push({
+            role: 'user',
+            content: question
+        });
+
+        // Build messages array with system prompt and history
+        const messages = [
+            {
+                role: 'system',
+                content: this.systemPrompt
+            },
+            ...this.conversationHistory
+        ];
+
+        try {
+            const request = await fetch(this.apiEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.apiToken}`
+                },
+                signal: this.stopController.signal,
+                body: JSON.stringify({
+                    model: this.selectedModel,
+                    messages: messages,
+                    temperature: this.temperature,
+                    top_p: this.topP,
+                    max_tokens: this.maxTokens,
+                    stream: this.stream,
+                })
+            });
+
+            if (!request.ok) {
+                throw new Error(`API Error: ${request.status} ${request.statusText}`);
+            }
+
+            let assistantResponse = '';
+
+            if (this.stream) {
+                assistantResponse = await this.streamResponse(request, answerElement);
+            } else {
+                assistantResponse = await this.response(request, answerElement);
+            }
+
+            // Add assistant response to history
+            this.conversationHistory.push({
+                role: 'assistant',
+                content: assistantResponse
+            });
+
+            // Save history to localStorage
+            this.saveHistory();
+
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                answerElement.innerHTML += '<br><em>(Response stopped by user)</em>';
+            } else {
+                answerElement.innerHTML = `<div class="error-message">❌ Error: ${error.message}</div>`;
+                console.error('OpenAI API Error:', error);
+            }
+        }
+
+        this.showSendButton();
+        this.hideStopButton();
+    }
+
+    stopStream() {
+        if (this.stream) {
+            this.stopController.abort();
+        }
+
+        this.showSendButton();
+        this.hideStopButton();
+    }
+
+    async streamResponse(request, answerElement) {
+        const reader = request.body?.pipeThrough(new TextDecoderStream()).getReader();
+    
+        let lastJsonLine = '';
+        let rawAnswer = '';
+
+        while (true) {
+            const res = await reader?.read();
+    
+            if (res?.done) {
+               return rawAnswer;
+            }
+    
+            if (!res?.value) {
+                continue;
+            }
+    
+            const jsonChunks = res.value.split('\n\n').filter(line => line.trim().length > 0);
+  
+            for (const chunk of jsonChunks) {
+                lastJsonLine += chunk;
+                if (lastJsonLine.startsWith('data:')) {
+                    lastJsonLine = lastJsonLine.slice('data:'.length).trim();
+                }
+
+                if (lastJsonLine === '[DONE]') {
+                    return rawAnswer;
+                }
+    
+                try {
+                    const answer = JSON.parse(lastJsonLine);
+                    lastJsonLine = '';
+    
+                    if (answer.choices && answer.choices[0].delta && answer.choices[0].delta.content) {
+                        const reply = answer.choices[0].delta.content;
+
+                        if (answerElement.querySelector('.dot-flashing')) {
+                            answerElement.querySelector('.dot-flashing').remove();
+                        }
+
+                        rawAnswer += reply;
+                        answerElement.innerHTML = marked.parse(rawAnswer);
+                        
+                        // Add copy buttons to code blocks
+                        this.addCopyButtonsToCodeBlocks(answerElement);
+                        
+                        this.chatLog.scrollTop = this.chatLog.scrollHeight;
+                    }
+                } catch (e) {
+                    // Incomplete JSON, continue accumulating
+                }
+            }
+        }
+    }
+
+    async response(request, answerElement) {
+        const response = await request.json();
+
+        if (response.choices && response.choices.length > 0) {
+            const content = response.choices[0].message.content;
+            answerElement.innerHTML = marked.parse(content);
+            this.addCopyButtonsToCodeBlocks(answerElement);
+            this.chatLog.scrollTop = this.chatLog.scrollHeight;
+            return content;
+        }
+        return '';
+    }
+
+    createMessage(sender) {
+        if (!(sender === 'user' || sender === 'bot')) {
+            return null;
+        }
+
+        const message = document.createElement('div');
+        message.classList.add('chat-log-message', `chat-log-message-${sender}`);
+
+        message.insertAdjacentHTML(
+            'beforeend',
+            `<div class="chat-log-message-author chat-log-message-author-${sender}">
+                <span class="author-icon">${sender === 'user' ? '👤' : '🤖'}</span>
+             </div>
+             <div class="chat-log-message-text chat-log-message-text-${sender}">
+                <div class="dot-flashing"></div>
+             </div>`
+        );
+
+        this.chatLog.appendChild(message);
+        this.chatLog.scrollTop = this.chatLog.scrollHeight;
+
+        return message.querySelector('.chat-log-message-text');
+    }
+
+    addCopyButtonsToCodeBlocks(element) {
+        const codeBlocks = element.querySelectorAll('pre code');
+        codeBlocks.forEach(codeBlock => {
+            if (!codeBlock.parentElement.querySelector('.copy-code-button')) {
+                const copyButton = document.createElement('button');
+                copyButton.className = 'copy-code-button';
+                copyButton.textContent = '📋 Copy';
+                copyButton.onclick = () => {
+                    navigator.clipboard.writeText(codeBlock.textContent);
+                    copyButton.textContent = '✓ Copied!';
+                    setTimeout(() => {
+                        copyButton.textContent = '📋 Copy';
+                    }, 2000);
+                };
+                codeBlock.parentElement.style.position = 'relative';
+                codeBlock.parentElement.insertBefore(copyButton, codeBlock);
+            }
+        });
+    }
+
+    clearHistory() {
+        if (confirm('Are you sure you want to clear the conversation history?')) {
+            this.conversationHistory = [];
+            this.chatLog.innerHTML = '';
+            this.saveHistory();
+        }
+    }
+
+    saveHistory() {
+        const widgetId = this._target;
+        localStorage.setItem(`openai_assistant_history_${widgetId}`, JSON.stringify(this.conversationHistory));
+    }
+
+    loadHistory() {
+        const widgetId = this._target;
+        const saved = localStorage.getItem(`openai_assistant_history_${widgetId}`);
+        
+        if (saved) {
+            try {
+                this.conversationHistory = JSON.parse(saved);
+                // Restore messages in UI
+                this.conversationHistory.forEach(msg => {
+                    if (msg.role === 'user' || msg.role === 'assistant') {
+                        const messageElement = this.createMessage(msg.role === 'user' ? 'user' : 'bot');
+                        if (messageElement.querySelector('.dot-flashing')) {
+                            messageElement.querySelector('.dot-flashing').remove();
+                        }
+                        messageElement.innerHTML = marked.parse(msg.content);
+                        this.addCopyButtonsToCodeBlocks(messageElement);
+                    }
+                });
+            } catch (e) {
+                console.error('Error loading history:', e);
+                this.conversationHistory = [];
+            }
+        }
+    }
+
+    hideSendButton() {
+        this.sendButton.classList.add('chat-form-button--hidden');
+    }
+
+    showSendButton() {
+        this.sendButton.classList.remove('chat-form-button--hidden');
+    }
+
+    hideStopButton() {
+        this.stopButton.classList.add('chat-form-button-stop--hidden');
+    }
+
+    showStopButton() {
+        this.stopButton.classList.remove('chat-form-button-stop--hidden');
+    }
+
+    hasPadding() {
+        return false;
+    }
+}
+

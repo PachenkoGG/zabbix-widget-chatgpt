@@ -1,0 +1,23 @@
+# Turkish translations for OpenAI Assistant Widget
+
+widget.name: 'OpenAI Asistan'
+form.token: 'OpenAI API Anahtarı'
+form.service.label: 'Servis Sağlayıcı'
+form.service.option.openai: 'OpenAI'
+form.service.option.custom: 'Özel Sağlayıcı'
+form.endpoint: 'API Endpoint'
+form.model: 'AI Modeli'
+form.temperature: 'Sıcaklık'
+form.top_p: 'Top P'
+form.max_tokens: 'Maksimum Token'
+form.system_prompt: 'Sistem İstemi'
+form.stream: 'Akış Yanıtı'
+form.stream.option.yes: 'Evet'
+form.stream.option.no: 'Hayır'
+form.advanced-configuration: 'Gelişmiş Yapılandırma'
+view.message.placeholder: 'Mesajınızı buraya yazın...'
+view.clear.button: 'Geçmişi Temizle'
+view.copy.button: 'Kopyala'
+view.error.api: 'API Hatası'
+view.error.network: 'Ağ Hatası'
+

@@ -1,0 +1,35 @@
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+*.cache
+
+# OS files
+Thumbs.db
+desktop.ini
+
+# Node modules (if using any build tools)
+node_modules/
+
+# Local configuration
+config.local.php
+.env
+.env.local
+
+# Build files
+dist/
+build/
+
+# Package files
+*.zip
+*.tar.gz
+*.rar
+

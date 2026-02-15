@@ -1,0 +1,94 @@
+/* OpenAI Assistant Widget Form Styles */
+
+.widget-openai-assistant-form {
+    padding: 20px;
+}
+
+.widget-openai-assistant-form .form-field {
+    margin-bottom: 20px;
+}
+
+.widget-openai-assistant-form label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333;
+}
+
+.widget-openai-assistant-form input[type="text"],
+.widget-openai-assistant-form select,
+.widget-openai-assistant-form textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+}
+
+.widget-openai-assistant-form input[type="text"]:focus,
+.widget-openai-assistant-form select:focus,
+.widget-openai-assistant-form textarea:focus {
+    border-color: #667eea;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.widget-openai-assistant-form textarea {
+    min-height: 80px;
+    resize: vertical;
+    font-family: inherit;
+}
+
+.widget-openai-assistant-form .field-hint {
+    display: inline-block;
+    margin-left: 8px;
+    cursor: help;
+}
+
+.widget-openai-assistant-form .fieldset-collapsible {
+    margin-top: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.widget-openai-assistant-form .fieldset-collapsible-header {
+    background: #f5f5f5;
+    padding: 12px 15px;
+    cursor: pointer;
+    font-weight: 600;
+    user-select: none;
+}
+
+.widget-openai-assistant-form .fieldset-collapsible-header:hover {
+    background: #ebebeb;
+}
+
+.widget-openai-assistant-form .fieldset-collapsible-content {
+    padding: 20px 15px;
+}
+
+.widget-openai-assistant-form .form-field-required::after {
+    content: ' *';
+    color: #e74c3c;
+}
+
+.widget-openai-assistant-form .info-message {
+    padding: 12px;
+    background: #e3f2fd;
+    border-left: 4px solid #2196f3;
+    border-radius: 4px;
+    margin-top: 15px;
+    font-size: 0.9rem;
+}
+
+.widget-openai-assistant-form .warning-message {
+    padding: 12px;
+    background: #fff3cd;
+    border-left: 4px solid #ffc107;
+    border-radius: 4px;
+    margin-top: 15px;
+    font-size: 0.9rem;
+}
+

@@ -1,0 +1,23 @@
+# English translations for OpenAI Assistant Widget
+
+widget.name: 'OpenAI Assistant'
+form.token: 'OpenAI API Token'
+form.service.label: 'Service Provider'
+form.service.option.openai: 'OpenAI'
+form.service.option.custom: 'Custom Provider'
+form.endpoint: 'API Endpoint'
+form.model: 'AI Model'
+form.temperature: 'Temperature'
+form.top_p: 'Top P'
+form.max_tokens: 'Max Tokens'
+form.system_prompt: 'System Prompt'
+form.stream: 'Stream Response'
+form.stream.option.yes: 'Yes'
+form.stream.option.no: 'No'
+form.advanced-configuration: 'Advanced Configuration'
+view.message.placeholder: 'Type your message here...'
+view.clear.button: 'Clear History'
+view.copy.button: 'Copy'
+view.error.api: 'API Error'
+view.error.network: 'Network Error'
+
