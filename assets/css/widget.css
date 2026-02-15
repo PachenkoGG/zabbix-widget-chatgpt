@@ -27,6 +27,26 @@
     font-weight: 600;
 }
 
+.zabbix-data-indicator {
+    background: rgba(76, 175, 80, 0.3);
+    color: #fff;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border: 1px solid rgba(76, 175, 80, 0.5);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: help;
+    transition: all 0.3s ease;
+}
+
+.zabbix-data-indicator:hover {
+    background: rgba(76, 175, 80, 0.5);
+    transform: scale(1.05);
+}
+
 .chat-clear-button {
     background: rgba(255, 255, 255, 0.2);
     color: #fff;

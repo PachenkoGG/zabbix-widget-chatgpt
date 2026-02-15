@@ -25,6 +25,8 @@ class CWidgetOpenAIAssistant extends CWidget {
     maxTokens = parseInt(this._fields.max_tokens) || 2048;
     systemPrompt = this._fields.system_prompt || 'You are a helpful assistant.';
     stream = this._fields.stream == 1;
+    enableZabbixData = this._fields.enable_zabbix_data == 1;
+    zabbixData = '';
     
     conversationHistory = [];
     abort = false;
@@ -38,6 +40,11 @@ class CWidgetOpenAIAssistant extends CWidget {
         this.userInput = this._body.querySelector('.chat-form-message');
         this.chatLog = this._body.querySelector('.chat-log');
 
+        // Store Zabbix data if available
+        if (response.body && response.body.zabbix_data) {
+            this.zabbixData = response.body.zabbix_data;
+        }
+
         this.userInput.addEventListener('keydown', e => {
             if (e.code == 'Enter' || e.code == 'NumpadEnter') {
                 this.sendMessage();
@@ -50,6 +57,11 @@ class CWidgetOpenAIAssistant extends CWidget {
         
         // Load conversation history from localStorage
         this.loadHistory();
+        
+        // Show Zabbix data indicator if enabled
+        if (this.enableZabbixData && this.zabbixData) {
+            this.showZabbixIndicator();
+        }
     }
 
     async sendMessage() {
@@ -81,9 +93,18 @@ class CWidgetOpenAIAssistant extends CWidget {
             {
                 role: 'system',
                 content: this.systemPrompt
-            },
-            ...this.conversationHistory
+            }
         ];
+
+        // Add Zabbix data as system context if enabled
+        if (this.enableZabbixData && this.zabbixData) {
+            messages.push({
+                role: 'system',
+                content: this.zabbixData
+            });
+        }
+
+        messages.push(...this.conversationHistory);
 
         try {
             // Build request body
@@ -361,6 +382,18 @@ class CWidgetOpenAIAssistant extends CWidget {
 
     hasPadding() {
         return false;
+    }
+
+    showZabbixIndicator() {
+        const indicator = document.createElement('div');
+        indicator.className = 'zabbix-data-indicator';
+        indicator.innerHTML = '📊 Zabbix Data Active';
+        indicator.title = 'AI can see current Zabbix problems and host status';
+        
+        const header = this._body.querySelector('.chat-header');
+        if (header) {
+            header.appendChild(indicator);
+        }
     }
 }
 

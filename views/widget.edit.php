@@ -16,6 +16,9 @@ use Modules\OpenAIAssistant\Widget;
     )
     ->addFieldset((new CWidgetFormFieldsetCollapsibleView(WidgetTranslator::translate('form.advanced-configuration')))
         ->addField(
+            new CWidgetFieldSelectView($data['fields']['enable_zabbix_data'])
+        )
+        ->addField(
             new CWidgetFieldSelectView($data['fields']['service'])
         )
         ->addField(

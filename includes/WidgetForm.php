@@ -74,6 +74,13 @@ class WidgetForm extends CWidgetForm
                     ]))
                     ->setDefault(1)
             )
+            ->addField(
+                (new CWidgetFieldSelect('enable_zabbix_data', WidgetTranslator::translate('form.enable_zabbix_data'), [
+                        1 => WidgetTranslator::translate('form.enable_zabbix_data.option.yes'),
+                        0 => WidgetTranslator::translate('form.enable_zabbix_data.option.no'),
+                    ]))
+                    ->setDefault(1)
+            )
         ;
     }
 }
