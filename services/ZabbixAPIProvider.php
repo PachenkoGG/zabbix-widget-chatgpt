@@ -241,31 +241,65 @@ class ZabbixAPIProvider
                 
                 foreach ($host['items'] as $item) {
                     $key = $item['key_'];
+                    $name = strtolower($item['name']);
                     
-                    // Match common metrics
-                    if (stripos($key, 'cpu') !== false || stripos($item['name'], 'CPU') !== false) {
-                        if (!isset($metrics['cpu'])) { // Take first match only
-                            $metrics['cpu'] = [
-                                'itemid' => $item['itemid'],
-                                'name' => $item['name'],
-                                'value' => $item['lastvalue'],
-                                'units' => $item['units']
-                            ];
+                    // Match common metrics - prioritize percentage/utilization metrics
+                    
+                    // CPU metrics - prefer utilization/usage percentage
+                    if (!isset($metrics['cpu'])) {
+                        if (stripos($key, 'cpu') !== false || stripos($name, 'cpu') !== false) {
+                            // Prioritize: utilization > usage > idle (inverted)
+                            if (stripos($name, 'utilization') !== false || stripos($name, 'usage') !== false) {
+                                $metrics['cpu'] = [
+                                    'itemid' => $item['itemid'],
+                                    'name' => $item['name'],
+                                    'value' => $item['lastvalue'],
+                                    'units' => $item['units']
+                                ];
+                            }
                         }
                     }
-                    elseif (stripos($key, 'memory') !== false || stripos($item['name'], 'Memory') !== false || stripos($item['name'], 'RAM') !== false) {
-                        if (!isset($metrics['memory'])) {
-                            $metrics['memory'] = [
-                                'itemid' => $item['itemid'],
-                                'name' => $item['name'],
-                                'value' => $item['lastvalue'],
-                                'units' => $item['units']
-                            ];
+                    
+                    // Memory metrics - prefer utilization percentage
+                    if (!isset($metrics['memory'])) {
+                        if (stripos($key, 'memory') !== false || stripos($name, 'memory') !== false || stripos($name, 'ram') !== false) {
+                            // Prioritize: "memory utilization" > "used memory" > others
+                            if (stripos($name, 'utilization') !== false || 
+                                stripos($name, 'usage') !== false ||
+                                (stripos($name, 'used') !== false && stripos($name, 'percent') !== false)) {
+                                $metrics['memory'] = [
+                                    'itemid' => $item['itemid'],
+                                    'name' => $item['name'],
+                                    'value' => $item['lastvalue'],
+                                    'units' => $item['units']
+                                ];
+                            }
                         }
                     }
-                    elseif (stripos($key, 'disk') !== false || stripos($item['name'], 'Disk') !== false || stripos($key, 'space') !== false || stripos($item['name'], 'space') !== false) {
-                        if (!isset($metrics['disk'])) {
-                            $metrics['disk'] = [
+                    
+                    // Disk metrics - prefer usage/utilization
+                    if (!isset($metrics['disk'])) {
+                        if (stripos($key, 'disk') !== false || stripos($key, 'vfs.fs') !== false || 
+                            stripos($name, 'disk') !== false || stripos($name, 'space') !== false) {
+                            // Prioritize: "used" or "utilization" over "free"/"available"
+                            if (stripos($name, 'utilization') !== false || 
+                                stripos($name, 'used') !== false ||
+                                stripos($name, 'usage') !== false) {
+                                $metrics['disk'] = [
+                                    'itemid' => $item['itemid'],
+                                    'name' => $item['name'],
+                                    'value' => $item['lastvalue'],
+                                    'units' => $item['units']
+                                ];
+                            }
+                        }
+                    }
+                    
+                    // Network metrics
+                    if (!isset($metrics['network'])) {
+                        if (stripos($key, 'net') !== false || stripos($name, 'network') !== false || 
+                            stripos($name, 'traffic') !== false || stripos($name, 'bandwidth') !== false) {
+                            $metrics['network'] = [
                                 'itemid' => $item['itemid'],
                                 'name' => $item['name'],
                                 'value' => $item['lastvalue'],
