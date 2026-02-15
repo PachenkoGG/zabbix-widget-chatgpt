@@ -67,7 +67,7 @@ class ZabbixAPIProvider
             $problems = $this->apiRequest('problem.get', [
                 'output' => ['eventid', 'objectid', 'name', 'severity', 'clock'],
                 'recent' => true,
-                'sortfield' => ['clock'],
+                'sortfield' => 'eventid',
                 'sortorder' => 'DESC',
                 'limit' => $limit
             ]);

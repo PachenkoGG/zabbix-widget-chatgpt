@@ -11,7 +11,13 @@ use Modules\OpenAIAssistant\Services\WidgetTranslator;
  */
 
 (new CWidgetView($data))
-    ->addItem(
+    ->setVar('zabbix_data', $data['zabbix_data'] ?? '')
+    ->addItem([
+        // Hidden input to pass Zabbix data to JavaScript
+        (new CInput('hidden', 'widget-zabbix-data'))
+            ->setAttribute('value', $data['zabbix_data'] ?? '')
+            ->setId('widget-zabbix-data')
+        ,
         (new CDiv([
             (new CDiv([
                 (new CTag('h3', true, 'OpenAI Assistant'))

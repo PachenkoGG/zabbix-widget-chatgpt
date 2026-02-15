@@ -45,18 +45,34 @@ class CWidgetOpenAIAssistant extends CWidget {
             console.log('=== OpenAI Widget Debug ===');
             console.log('Full Response:', response);
             console.log('Response type:', typeof response);
-            console.log('Response body type:', typeof response.body);
-            console.log('Response body:', response.body);
-            console.log('Response body keys:', response.body ? Object.keys(response.body) : 'NO BODY');
-            console.log('Zabbix data in body:', response.body && response.body.zabbix_data);
-            console.log('Zabbix data available:', !!(response && response.body && response.body.zabbix_data));
+            console.log('this._data:', this._data);
+            console.log('this._data keys:', this._data ? Object.keys(this._data) : 'NO _DATA');
             
-            if (response && response.body && response.body.zabbix_data) {
-                this.zabbixData = response.body.zabbix_data;
+            // Try to get Zabbix data from hidden input
+            const hiddenInput = this._body.querySelector('#widget-zabbix-data');
+            console.log('Hidden input found:', !!hiddenInput);
+            
+            let zabbixData = '';
+            
+            if (hiddenInput && hiddenInput.value) {
+                console.log('Source: Hidden input #widget-zabbix-data');
+                zabbixData = hiddenInput.value;
+            } else if (this._data && this._data.zabbix_data) {
+                console.log('Source: this._data.zabbix_data');
+                zabbixData = this._data.zabbix_data;
+            } else if (response && response.zabbix_data) {
+                console.log('Source: response.zabbix_data');
+                zabbixData = response.zabbix_data;
+            }
+            
+            console.log('Zabbix data found:', !!zabbixData);
+            
+            if (zabbixData) {
+                this.zabbixData = zabbixData;
                 console.log('✓ Zabbix data loaded! Length:', this.zabbixData.length);
                 console.log('Zabbix data preview:', this.zabbixData.substring(0, 200));
             } else {
-                console.log('✗ No Zabbix data in response');
+                console.log('✗ No Zabbix data found');
                 this.zabbixData = '';
             }
         } catch (e) {
