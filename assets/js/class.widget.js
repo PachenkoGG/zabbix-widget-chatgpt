@@ -40,9 +40,14 @@ class CWidgetOpenAIAssistant extends CWidget {
         this.userInput = this._body.querySelector('.chat-form-message');
         this.chatLog = this._body.querySelector('.chat-log');
 
-        // Store Zabbix data if available
-        if (response.body && response.body.zabbix_data) {
-            this.zabbixData = response.body.zabbix_data;
+        // Store Zabbix data if available (with error handling)
+        try {
+            if (response && response.body && response.body.zabbix_data) {
+                this.zabbixData = response.body.zabbix_data;
+            }
+        } catch (e) {
+            console.warn('Could not load Zabbix data:', e);
+            this.zabbixData = '';
         }
 
         this.userInput.addEventListener('keydown', e => {
@@ -59,8 +64,12 @@ class CWidgetOpenAIAssistant extends CWidget {
         this.loadHistory();
         
         // Show Zabbix data indicator if enabled
-        if (this.enableZabbixData && this.zabbixData) {
-            this.showZabbixIndicator();
+        try {
+            if (this.enableZabbixData && this.zabbixData) {
+                this.showZabbixIndicator();
+            }
+        } catch (e) {
+            console.warn('Could not show Zabbix indicator:', e);
         }
     }
 

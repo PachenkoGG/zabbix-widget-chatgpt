@@ -13,10 +13,16 @@ class WidgetView extends CControllerDashboardWidgetView {
 
     protected function doAction(): void {
         
-        // Get Zabbix data if enabled
+        // Get Zabbix data if enabled (with error handling)
         $zabbixData = '';
         if (!empty($this->fields_values['enable_zabbix_data'])) {
-            $zabbixData = ZabbixDataProvider::formatForAI();
+            try {
+                $zabbixData = ZabbixDataProvider::formatForAI();
+            } catch (\Exception $e) {
+                // Silently fail - widget should still work without Zabbix data
+                error_log('OpenAI Widget: Could not fetch Zabbix data - ' . $e->getMessage());
+                $zabbixData = '';
+            }
         }
 
         $this->setResponse(new CControllerResponseData([

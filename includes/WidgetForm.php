@@ -79,7 +79,7 @@ class WidgetForm extends CWidgetForm
                         1 => WidgetTranslator::translate('form.enable_zabbix_data.option.yes'),
                         0 => WidgetTranslator::translate('form.enable_zabbix_data.option.no'),
                     ]))
-                    ->setDefault(1)
+                    ->setDefault(0)
             )
         ;
     }

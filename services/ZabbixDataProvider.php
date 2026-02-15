@@ -13,6 +13,11 @@ class ZabbixDataProvider
      */
     public static function getProblems($limit = 10) {
         try {
+            // Check if CAPIManager exists
+            if (!class_exists('\CAPIManager')) {
+                return [];
+            }
+            
             // Use Zabbix API Manager
             $api = new \CAPIManager();
             
@@ -27,6 +32,7 @@ class ZabbixDataProvider
             
             return $problems ?: [];
         } catch (\Exception $e) {
+            error_log('ZabbixDataProvider::getProblems error: ' . $e->getMessage());
             return [];
         }
     }
@@ -36,6 +42,11 @@ class ZabbixDataProvider
      */
     public static function getHostsWithProblems($limit = 20) {
         try {
+            // Check if CAPIManager exists
+            if (!class_exists('\CAPIManager')) {
+                return [];
+            }
+            
             $api = new \CAPIManager();
             
             $hosts = $api->call('host.get', [
@@ -48,6 +59,7 @@ class ZabbixDataProvider
             
             return $hosts ?: [];
         } catch (\Exception $e) {
+            error_log('ZabbixDataProvider::getHostsWithProblems error: ' . $e->getMessage());
             return [];
         }
     }
@@ -57,6 +69,11 @@ class ZabbixDataProvider
      */
     public static function getStatistics() {
         try {
+            // Check if CAPIManager exists
+            if (!class_exists('\CAPIManager')) {
+                return null;
+            }
+            
             $api = new \CAPIManager();
             
             // Total hosts
@@ -109,13 +126,20 @@ class ZabbixDataProvider
      * Format Zabbix data for AI context
      */
     public static function formatForAI() {
-        $stats = self::getStatistics();
-        $problems = self::getProblems(10);
-        $hosts = self::getHostsWithProblems(10);
-        
-        if (!$stats) {
-            return "Zabbix data unavailable.";
+        // Check if we're in Zabbix environment
+        if (!class_exists('\CAPIManager')) {
+            error_log('OpenAI Widget: CAPIManager class not found - Zabbix data disabled');
+            return '';
         }
+        
+        try {
+            $stats = self::getStatistics();
+            $problems = self::getProblems(10);
+            $hosts = self::getHostsWithProblems(10);
+            
+            if (!$stats) {
+                return '';
+            }
         
         $context = "=== CURRENT ZABBIX STATUS ===\n\n";
         
@@ -162,6 +186,11 @@ class ZabbixDataProvider
         $context .= "\n=== END ZABBIX STATUS ===\n";
         
         return $context;
+        
+        } catch (\Exception $e) {
+            error_log('OpenAI Widget: Error formatting Zabbix data - ' . $e->getMessage());
+            return '';
+        }
     }
     
     /**
