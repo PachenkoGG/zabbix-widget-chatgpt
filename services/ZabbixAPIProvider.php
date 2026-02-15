@@ -455,7 +455,8 @@ class ZabbixAPIProvider
                     $hostsWithMetrics[] = [
                         'host' => $host['name'],
                         'hostname' => $host['host'],
-                        'metrics' => $metrics
+                        'metrics' => $metrics,
+                        'all_items' => $items  // Add ALL items for comprehensive queries
                     ];
                 }
             }
@@ -561,9 +562,11 @@ class ZabbixAPIProvider
             if (!empty($hostsWithMetrics)) {
                 $context .= "**Monitored Hosts with Current Metrics:**\n\n";
                 foreach ($hostsWithMetrics as $i => $hostData) {
-                    $context .= ($i + 1) . ". **{$hostData['host']}** ({$hostData['hostname']})\n";
+                    $context .= ($i + 1) . ". **{$hostData['host']}** ({$hostData['hostname']})\n\n";
                     
+                    // SECTION 1: Key Metrics (with history)
                     if (!empty($hostData['metrics'])) {
+                        $context .= "   **Key Metrics:**\n";
                         foreach ($hostData['metrics'] as $metricType => $metric) {
                             // Handle text values (like OS name) differently
                             if ($metricType === 'os' || !is_numeric($metric['value'])) {
@@ -574,14 +577,14 @@ class ZabbixAPIProvider
                             
                             $context .= "   - {$metric['name']}: {$value}";
                             
-                            // Add history stats ONLY for usage/utilization metrics (not for static info like CPU cores, RAM total, OS, uptime)
+                            // Add history stats ONLY for usage/utilization metrics
                             $isUsageMetric = (stripos($metricType, 'usage') !== false || 
                                              stripos($metricType, 'utilization') !== false ||
                                              $metricType === 'disk_usage' ||
                                              $metricType === 'network');
                             
                             if ($isUsageMetric && isset($metric['itemid'])) {
-                                $stats = $this->getItemHistoryStats($metric['itemid'], 7200); // Last 2 hours
+                                $stats = $this->getItemHistoryStats($metric['itemid'], 7200);
                                 if ($stats) {
                                     $minVal = $this->formatMetricValue($stats['min'], $metric['units']);
                                     $maxVal = $this->formatMetricValue($stats['max'], $metric['units']);
@@ -592,19 +595,55 @@ class ZabbixAPIProvider
                             
                             $context .= "\n";
                         }
-                    } else {
-                        $context .= "   - No metrics available\n";
+                        $context .= "\n";
                     }
-                    $context .= "\n";
+                    
+                    // SECTION 2: All Other Items (for comprehensive queries)
+                    if (!empty($hostData['all_items'])) {
+                        $context .= "   **All Available Metrics (Total: " . count($hostData['all_items']) . "):**\n";
+                        
+                        // Group items to avoid overwhelming the AI
+                        $itemCount = 0;
+                        $maxItems = 100; // Limit to prevent token overflow
+                        
+                        foreach ($hostData['all_items'] as $item) {
+                            if ($itemCount >= $maxItems) {
+                                $context .= "   ... and " . (count($hostData['all_items']) - $maxItems) . " more items\n";
+                                break;
+                            }
+                            
+                            // Skip items already shown in Key Metrics
+                            $alreadyShown = false;
+                            foreach ($hostData['metrics'] as $metric) {
+                                if (isset($metric['itemid']) && $metric['itemid'] === $item['itemid']) {
+                                    $alreadyShown = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (!$alreadyShown) {
+                                // Format value
+                                if (!is_numeric($item['lastvalue'])) {
+                                    $value = $item['lastvalue'];
+                                } else {
+                                    $value = $this->formatMetricValue($item['lastvalue'], $item['units']);
+                                }
+                                
+                                $context .= "   - {$item['name']}: {$value}\n";
+                                $itemCount++;
+                            }
+                        }
+                        $context .= "\n";
+                    }
                 }
             }
             
             $context .= "\n=== END ZABBIX STATUS ===\n";
             $context .= "\n**Important Notes:**\n";
-            $context .= "- Each metric shows: Current value (Last 2h: Min, Max, Avg)\n";
-            $context .= "- You can answer questions about current values and recent trends (last 2 hours)\n";
-            $context .= "- If user asks about specific time periods, use the available 2-hour statistics\n";
-            $context .= "- Example: 'Son 2 saat CPU %X ile %Y arasında değişti, ortalama %Z oldu'\n";
+            $context .= "- Key metrics show current value with 2-hour history (Min/Max/Avg)\n";
+            $context .= "- All available metrics are listed for comprehensive queries\n";
+            $context .= "- You can answer ANY question about ANY metric listed above\n";
+            $context .= "- Examples: 'zabbix available memory kaç', 'zabbix swap kullanımı', 'zabbix network interface durumu'\n";
             
             return $context;
             
