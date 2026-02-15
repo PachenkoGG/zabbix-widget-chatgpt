@@ -30,6 +30,52 @@ class CWidgetOpenAIAssistant extends CWidget {
     
     conversationHistory = [];
     abort = false;
+    
+    /**
+     * Sanitize HTML to prevent XSS
+     */
+    sanitizeHTML(html) {
+        const temp = document.createElement('div');
+        temp.textContent = html;
+        return temp.innerHTML;
+    }
+    
+    /**
+     * Safe markdown parse with XSS protection
+     */
+    safeMarkdownParse(markdown) {
+        // Parse markdown to HTML
+        let html = marked.parse(markdown);
+        
+        // Allow only safe HTML tags
+        const allowedTags = ['p', 'br', 'strong', 'em', 'code', 'pre', 'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li', 'blockquote', 'a', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'hr'];
+        
+        // Create temporary element
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+        
+        // Remove script tags and event handlers
+        const scripts = temp.querySelectorAll('script');
+        scripts.forEach(script => script.remove());
+        
+        // Remove inline event handlers
+        const allElements = temp.querySelectorAll('*');
+        allElements.forEach(el => {
+            // Remove on* attributes (onclick, onerror, etc.)
+            Array.from(el.attributes).forEach(attr => {
+                if (attr.name.startsWith('on')) {
+                    el.removeAttribute(attr.name);
+                }
+            });
+            
+            // Sanitize href (prevent javascript:)
+            if (el.tagName === 'A' && el.href && el.href.toLowerCase().startsWith('javascript:')) {
+                el.href = '#';
+            }
+        });
+        
+        return temp.innerHTML;
+    }
 
     setContents(response) {
         super.setContents(response);
@@ -117,7 +163,7 @@ class CWidgetOpenAIAssistant extends CWidget {
         this.stopController = new AbortController();
 
         const questionElement = this.createMessage('user');
-        questionElement.innerHTML = marked.parse(question);
+        questionElement.innerHTML = this.safeMarkdownParse(question);
 
         const answerElement = this.createMessage('bot');
 
@@ -302,7 +348,7 @@ class CWidgetOpenAIAssistant extends CWidget {
                         }
 
                         rawAnswer += reply;
-                        answerElement.innerHTML = marked.parse(rawAnswer);
+                        answerElement.innerHTML = this.safeMarkdownParse(rawAnswer);
                         
                         // Add copy buttons to code blocks
                         this.addCopyButtonsToCodeBlocks(answerElement);
@@ -321,7 +367,7 @@ class CWidgetOpenAIAssistant extends CWidget {
 
         if (response.choices && response.choices.length > 0) {
             const content = response.choices[0].message.content;
-            answerElement.innerHTML = marked.parse(content);
+            answerElement.innerHTML = this.safeMarkdownParse(content);
             this.addCopyButtonsToCodeBlocks(answerElement);
             this.chatLog.scrollTop = this.chatLog.scrollHeight;
             return content;
@@ -404,7 +450,7 @@ class CWidgetOpenAIAssistant extends CWidget {
                         if (messageElement.querySelector('.dot-flashing')) {
                             messageElement.querySelector('.dot-flashing').remove();
                         }
-                        messageElement.innerHTML = marked.parse(msg.content);
+                        messageElement.innerHTML = this.safeMarkdownParse(msg.content);
                         this.addCopyButtonsToCodeBlocks(messageElement);
                     }
                 });
