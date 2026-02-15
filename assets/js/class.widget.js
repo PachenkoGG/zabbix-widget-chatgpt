@@ -127,7 +127,25 @@ class CWidgetOpenAIAssistant extends CWidget {
             if (error.name === 'AbortError') {
                 answerElement.innerHTML += '<br><em>(Response stopped by user)</em>';
             } else {
-                answerElement.innerHTML = `<div class="error-message">❌ Error: ${error.message}</div>`;
+                let errorMsg = error.message;
+                
+                // Check if it's a 429 error
+                if (errorMsg.includes('429')) {
+                    errorMsg = `
+                        <strong>API Rate Limit / Quota Exceeded (Error 429)</strong><br><br>
+                        This usually means:<br>
+                        • Your OpenAI account is out of credits<br>
+                        • You've hit the rate limit (too many requests)<br>
+                        • Your API key is on free tier with limited access<br><br>
+                        <strong>Solutions:</strong><br>
+                        1. Check your OpenAI billing: <a href="https://platform.openai.com/account/billing" target="_blank">platform.openai.com/account/billing</a><br>
+                        2. Add credits to your account (minimum $5)<br>
+                        3. Wait a few minutes and try again<br>
+                        4. Try using GPT-4o Mini (cheaper model)
+                    `;
+                }
+                
+                answerElement.innerHTML = `<div class="error-message">❌ Error: ${errorMsg}</div>`;
                 console.error('OpenAI API Error:', error);
             }
         }
