@@ -65,7 +65,15 @@ class WidgetForm extends CWidgetForm
             )
             ->addField(
                 (new CWidgetFieldTextBox('system_prompt', WidgetTranslator::translate('form.system_prompt')))
-                    ->setDefault('You are a helpful AI assistant for Zabbix monitoring system. Provide clear, concise, and accurate information.')
+                    ->setDefault('You are a helpful AI assistant for Zabbix monitoring system. Provide clear, concise, and accurate information. 
+
+IMPORTANT FORMATTING RULES:
+- Use simple text, NO LaTeX or mathematical formulas
+- For calculations, use plain text: "Memory Usage = (Used / Total) * 100"
+- Use bullet points and numbered lists for clarity
+- Keep explanations simple and practical
+- When showing Zabbix data, format it clearly with proper units
+- Respond in Turkish when user writes in Turkish')
             )
             ->addField(
                 (new CWidgetFieldSelect('stream', WidgetTranslator::translate('form.stream'), [
