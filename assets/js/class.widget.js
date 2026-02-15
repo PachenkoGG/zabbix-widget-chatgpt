@@ -86,6 +86,23 @@ class CWidgetOpenAIAssistant extends CWidget {
         ];
 
         try {
+            // Build request body
+            const requestBody = {
+                model: this.selectedModel,
+                messages: messages,
+                stream: this.stream,
+            };
+
+            // Some models (O1, O3) don't support these parameters
+            const specialModels = ['o1', 'o3-mini', 'o3', 'o4-mini'];
+            const isSpecialModel = specialModels.includes(this.selectedModel);
+
+            if (!isSpecialModel) {
+                requestBody.temperature = this.temperature;
+                requestBody.top_p = this.topP;
+                requestBody.max_tokens = this.maxTokens;
+            }
+
             const request = await fetch(this.apiEndpoint, {
                 method: 'POST',
                 headers: {
@@ -93,18 +110,14 @@ class CWidgetOpenAIAssistant extends CWidget {
                     'Authorization': `Bearer ${this.apiToken}`
                 },
                 signal: this.stopController.signal,
-                body: JSON.stringify({
-                    model: this.selectedModel,
-                    messages: messages,
-                    temperature: this.temperature,
-                    top_p: this.topP,
-                    max_tokens: this.maxTokens,
-                    stream: this.stream,
-                })
+                body: JSON.stringify(requestBody)
             });
 
             if (!request.ok) {
-                throw new Error(`API Error: ${request.status} ${request.statusText}`);
+                // Get detailed error message
+                const errorData = await request.json().catch(() => ({}));
+                const errorMsg = errorData.error?.message || `${request.status} ${request.statusText}`;
+                throw new Error(`API Error: ${errorMsg}`);
             }
 
             let assistantResponse = '';
@@ -130,7 +143,7 @@ class CWidgetOpenAIAssistant extends CWidget {
             } else {
                 let errorMsg = error.message;
                 
-                // Check if it's a 429 error
+                // Check for specific error codes
                 if (errorMsg.includes('429')) {
                     errorMsg = `
                         <strong>API Rate Limit / Quota Exceeded (Error 429)</strong><br><br>
@@ -144,10 +157,26 @@ class CWidgetOpenAIAssistant extends CWidget {
                         3. Wait a few minutes and try again<br>
                         4. Try using GPT-4o Mini (cheaper model)
                     `;
+                } else if (errorMsg.includes('400')) {
+                    errorMsg = `
+                        <strong>Bad Request (Error 400)</strong><br><br>
+                        This usually means:<br>
+                        • The selected model doesn't support some parameters<br>
+                        • System prompt is too long or invalid<br>
+                        • Model name is incorrect<br><br>
+                        <strong>Solutions:</strong><br>
+                        1. Try switching to <strong>GPT-4o Mini</strong> model<br>
+                        2. Check if your system prompt is too long<br>
+                        3. O1/O3 models have special requirements<br>
+                        4. See browser console (F12) for detailed error<br><br>
+                        <strong>Current model:</strong> ${this.selectedModel}
+                    `;
                 }
                 
-                answerElement.innerHTML = `<div class="error-message">❌ Error: ${errorMsg}</div>`;
+                answerElement.innerHTML = `<div class="error-message">❌ ${errorMsg}</div>`;
                 console.error('OpenAI API Error:', error);
+                console.error('Model:', this.selectedModel);
+                console.error('Endpoint:', this.apiEndpoint);
             }
         }
 
