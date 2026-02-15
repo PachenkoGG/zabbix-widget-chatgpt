@@ -1,6 +1,6 @@
 # OpenAI Assistant Widget for Zabbix 7.0
 
-Advanced AI-powered chat widget for Zabbix dashboards with multiple OpenAI model support and conversation history.
+🤖 Advanced AI-powered chat widget with **Zabbix monitoring integration**! Ask questions about your infrastructure and get intelligent insights.
 
 ## Features
 
@@ -14,6 +14,13 @@ Advanced AI-powered chat widget for Zabbix dashboards with multiple OpenAI model
 - GPT-4.1 Mini
 - GPT-5
 - GPT-5 Mini
+
+✅ **🆕 Zabbix Integration**
+- Real-time problem monitoring
+- Host status information
+- Severity level breakdown
+- AI can analyze your infrastructure
+- Token-based secure API access
 
 ✅ **Advanced Features**
 - Conversation history with localStorage
@@ -67,6 +74,9 @@ Advanced AI-powered chat widget for Zabbix dashboards with multiple OpenAI model
 
 ### Advanced Configuration
 
+- **Include Zabbix Data**: Enable AI access to Zabbix monitoring data
+- **Zabbix API URL**: Zabbix API endpoint (e.g., `http://localhost/zabbix/api_jsonrpc.php`)
+- **Zabbix API Token**: API token from Administration → API tokens
 - **Service Provider**: Choose between OpenAI or custom provider
 - **API Endpoint**: API endpoint URL (default: https://api.openai.com/v1/chat/completions)
 - **AI Model**: Select from available OpenAI models
@@ -76,12 +86,61 @@ Advanced AI-powered chat widget for Zabbix dashboards with multiple OpenAI model
 - **Max Tokens**: Maximum tokens in response (default: 2048)
 - **System Prompt**: Define AI assistant behavior and personality
 
+## Zabbix Integration Setup
+
+### 1. Create Zabbix API Token
+
+1. Go to **Administration → API tokens**
+2. Click **Create API token**
+3. Enter a name (e.g., "OpenAI Widget API")
+4. Select a user with appropriate permissions
+5. Leave "Expires at" empty for no expiration
+6. Click **Add** and copy the generated token
+
+### 2. Configure Widget
+
+1. Edit the widget
+2. Expand **Advanced Configuration**
+3. Set **Include Zabbix Data** to **Yes**
+4. Enter **Zabbix API URL**: `http://localhost/zabbix/api_jsonrpc.php`
+5. Paste your **Zabbix API Token**
+6. Click **Apply** and **Update**
+
+### 3. Test Integration
+
+Ask the AI:
+```
+"How many problems are in the system?"
+"Show me high severity issues"
+"Which hosts have problems?"
+```
+
+The AI will now have access to:
+- Total hosts and problems
+- Problem severity breakdown
+- Recent problems with details
+- Host information
+
 ## Usage
 
 1. Add widget to your Zabbix dashboard
 2. Configure with your OpenAI API token
-3. Select preferred AI model
-4. Start chatting!
+3. (Optional) Configure Zabbix API integration
+4. Select preferred AI model
+5. Start chatting!
+
+### Example Questions
+
+**Without Zabbix Integration:**
+- "Explain how to configure Zabbix triggers"
+- "Write a Python script to query Zabbix API"
+- "What are best practices for monitoring?"
+
+**With Zabbix Integration:**
+- "What's the current status of my infrastructure?"
+- "Show me the most critical problems"
+- "Which hosts are experiencing issues?"
+- "Analyze the severity distribution of current problems"
 
 ### Tips
 
@@ -90,6 +149,7 @@ Advanced AI-powered chat widget for Zabbix dashboards with multiple OpenAI model
 - Click **Copy** button on code blocks to easily copy snippets
 - Press **Enter** to send messages
 - Use **Stop** button to interrupt long responses
+- Enable Zabbix integration for infrastructure-aware AI assistance
 
 ## Model Comparison
 
