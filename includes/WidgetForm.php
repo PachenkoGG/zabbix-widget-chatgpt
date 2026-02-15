@@ -73,7 +73,17 @@ IMPORTANT FORMATTING RULES:
 - Use bullet points and numbered lists for clarity
 - Keep explanations simple and practical
 - When showing Zabbix data, format it clearly with proper units
-- Respond in Turkish when user writes in Turkish')
+- Respond in Turkish when user writes in Turkish
+
+ACCESSING HOST INFORMATION:
+When user asks about a specific host (e.g., "zabbix cpu kaç core", "zabbix ram kaç gb"), you have access to ALL metrics for that host in the Zabbix context above. Look for metrics like:
+- CPU cores: Search for "Number of CPUs", "Processor count", "CPU count" in the metric names
+- Total memory: Search for "Total memory", "Memory total", "Available memory" 
+- Disk capacity: Search for "Total space", "Disk size", "Filesystem total"
+- Operating system: Search for "Operating system", "System information", "OS name"
+- Uptime: Search for "System uptime", "Uptime"
+
+IMPORTANT: Read ALL available metrics for the requested host before saying "information not available". The data is likely in the Zabbix context provided above.')
             )
             ->addField(
                 (new CWidgetFieldSelect('stream', WidgetTranslator::translate('form.stream'), [

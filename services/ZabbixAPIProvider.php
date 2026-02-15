@@ -179,21 +179,56 @@ class ZabbixAPIProvider
             
             $hostId = $hosts[0]['hostid'];
             
-            // Get items for this host (CPU, Memory, Disk, Network, etc.)
+            // Get ALL items for this host (no filtering for comprehensive data)
             $items = $this->apiRequest('item.get', [
                 'output' => ['itemid', 'name', 'key_', 'lastvalue', 'units', 'value_type'],
                 'hostids' => $hostId,
                 'monitored' => true,
-                'filter' => [
-                    'value_type' => [0, 3] // Numeric (float and unsigned int)
-                ],
                 'sortfield' => 'name',
-                'limit' => $limit
+                'limit' => 500  // Increased limit for comprehensive data
             ]);
+            
+            // Organize items by category
+            $organized = [
+                'cpu' => [],
+                'memory' => [],
+                'disk' => [],
+                'network' => [],
+                'system' => []
+            ];
+            
+            foreach ($items as $item) {
+                $key = strtolower($item['key_']);
+                $name = strtolower($item['name']);
+                
+                // CPU metrics
+                if (stripos($key, 'cpu') !== false || stripos($name, 'cpu') !== false || stripos($name, 'processor') !== false) {
+                    $organized['cpu'][] = $item;
+                }
+                // Memory metrics
+                elseif (stripos($key, 'memory') !== false || stripos($key, 'vm.memory') !== false || stripos($name, 'memory') !== false || stripos($name, 'ram') !== false) {
+                    $organized['memory'][] = $item;
+                }
+                // Disk/Filesystem metrics
+                elseif (stripos($key, 'vfs.fs') !== false || stripos($key, 'disk') !== false || stripos($name, 'disk') !== false || stripos($name, 'filesystem') !== false || stripos($name, 'space') !== false) {
+                    $organized['disk'][] = $item;
+                }
+                // Network metrics
+                elseif (stripos($key, 'net.if') !== false || stripos($name, 'network') !== false || stripos($name, 'interface') !== false) {
+                    $organized['network'][] = $item;
+                }
+                // System info (OS, uptime, etc.)
+                elseif (stripos($key, 'system') !== false || stripos($name, 'system') !== false || 
+                        stripos($name, 'operating system') !== false || stripos($name, 'uptime') !== false ||
+                        stripos($name, 'hostname') !== false || stripos($name, 'architecture') !== false) {
+                    $organized['system'][] = $item;
+                }
+            }
             
             return [
                 'host' => $hosts[0],
-                'items' => $items
+                'items' => $items,
+                'organized' => $organized
             ];
             
         } catch (\Exception $e) {
@@ -233,14 +268,10 @@ class ZabbixAPIProvider
                 'limit' => $limit
             ]);
             
-            error_log('=== DEBUG: Host Items ===');
-            
             // Get key metrics for each host
             $hostsWithMetrics = [];
             foreach ($hosts as $host) {
                 $metrics = [];
-                
-                error_log("Host: {$host['name']} ({$host['host']})");
                 
                 // Get items directly for this host (not through selectItems)
                 $items = $this->apiRequest('item.get', [
@@ -252,104 +283,91 @@ class ZabbixAPIProvider
                     ],
                     'searchByAny' => true,
                     'sortfield' => 'name',
-                    'limit' => 100
-                ]);
+                'limit' => 100
+            ]);
+            
+            // Collect candidate metrics
+            $diskCandidates = [];
+            
+            foreach ($items as $item) {
+                $key = $item['key_'];
+                $name = strtolower($item['name']);
                 
-                error_log("Total items: " . count($items));
-                
-                // Collect candidate metrics
-                $diskCandidates = [];
-                
-                foreach ($items as $item) {
-                    $key = $item['key_'];
-                    $name = strtolower($item['name']);
+                // Collect disk candidates for / filesystem
+                if ((stripos($name, 'fs [/]') !== false || stripos($key, '[/,') !== false) &&
+                    stripos($name, 'used') !== false && stripos($name, 'inode') === false) {
+                    $diskCandidates[] = $item;
+                }
                     
-                    // Log disk-related items
-                    if (stripos($key, 'disk') !== false || stripos($key, 'vfs.fs') !== false || 
-                        stripos($name, 'disk') !== false || stripos($name, 'space') !== false) {
-                        error_log("  - Disk item: {$item['name']} | key: {$item['key_']} | value: {$item['lastvalue']} | units: {$item['units']}");
-                        
-                        // Collect disk candidates for / filesystem
-                        if ((stripos($name, 'fs [/]') !== false || stripos($key, '[/,') !== false) &&
-                            stripos($name, 'used') !== false && stripos($name, 'inode') === false) {
-                            $diskCandidates[] = $item;
-                        }
-                    }
-                    
-                    // Match CPU metrics
-                    if (!isset($metrics['cpu'])) {
-                        if (stripos($key, 'cpu') !== false || stripos($name, 'cpu') !== false) {
-                            if (stripos($name, 'utilization') !== false || stripos($name, 'usage') !== false) {
-                                $metrics['cpu'] = [
-                                    'itemid' => $item['itemid'],
-                                    'name' => $item['name'],
-                                    'value' => $item['lastvalue'],
-                                    'units' => $item['units']
-                                ];
-                                error_log("  -> Selected CPU: {$item['name']}");
-                            }
-                        }
-                    }
-                    
-                    // Match Memory metrics
-                    if (!isset($metrics['memory'])) {
-                        if (stripos($key, 'memory') !== false || stripos($name, 'memory') !== false || stripos($name, 'ram') !== false) {
-                            if (stripos($name, 'utilization') !== false || 
-                                stripos($name, 'usage') !== false ||
-                                (stripos($name, 'used') !== false && stripos($name, 'percent') !== false)) {
-                                $metrics['memory'] = [
-                                    'itemid' => $item['itemid'],
-                                    'name' => $item['name'],
-                                    'value' => $item['lastvalue'],
-                                    'units' => $item['units']
-                                ];
-                                error_log("  -> Selected Memory: {$item['name']}");
-                            }
-                        }
-                    }
-                    
-                    // Match Network metrics
-                    if (!isset($metrics['network'])) {
-                        if (stripos($key, 'net.if') !== false || stripos($name, 'network') !== false || 
-                            stripos($name, 'traffic') !== false || stripos($name, 'bandwidth') !== false) {
-                            $metrics['network'] = [
+                // Match CPU metrics
+                if (!isset($metrics['cpu'])) {
+                    if (stripos($key, 'cpu') !== false || stripos($name, 'cpu') !== false) {
+                        if (stripos($name, 'utilization') !== false || stripos($name, 'usage') !== false) {
+                            $metrics['cpu'] = [
                                 'itemid' => $item['itemid'],
                                 'name' => $item['name'],
                                 'value' => $item['lastvalue'],
                                 'units' => $item['units']
                             ];
-                            error_log("  -> Selected Network: {$item['name']}");
                         }
                     }
                 }
                 
-                // Now select best disk metric from candidates
-                if (!empty($diskCandidates) && !isset($metrics['disk'])) {
-                    // Priority 1: Find percentage metric
-                    foreach ($diskCandidates as $candidate) {
-                        if ($candidate['units'] === '%' || stripos($candidate['name'], 'in %') !== false) {
-                            $metrics['disk'] = [
-                                'itemid' => $candidate['itemid'],
-                                'name' => $candidate['name'],
-                                'value' => $candidate['lastvalue'],
-                                'units' => $candidate['units']
+                // Match Memory metrics
+                if (!isset($metrics['memory'])) {
+                    if (stripos($key, 'memory') !== false || stripos($name, 'memory') !== false || stripos($name, 'ram') !== false) {
+                        if (stripos($name, 'utilization') !== false || 
+                            stripos($name, 'usage') !== false ||
+                            (stripos($name, 'used') !== false && stripos($name, 'percent') !== false)) {
+                            $metrics['memory'] = [
+                                'itemid' => $item['itemid'],
+                                'name' => $item['name'],
+                                'value' => $item['lastvalue'],
+                                'units' => $item['units']
                             ];
-                            error_log("  -> Selected Disk: {$candidate['name']} (PERCENTAGE - best choice)");
-                            break;
                         }
                     }
-                    
-                    // Priority 2: If no percentage found, use bytes
-                    if (!isset($metrics['disk']) && !empty($diskCandidates)) {
-                        $metrics['disk'] = [
-                            'itemid' => $diskCandidates[0]['itemid'],
-                            'name' => $diskCandidates[0]['name'],
-                            'value' => $diskCandidates[0]['lastvalue'],
-                            'units' => $diskCandidates[0]['units']
+                }
+                
+                // Match Network metrics
+                if (!isset($metrics['network'])) {
+                    if (stripos($key, 'net.if') !== false || stripos($name, 'network') !== false || 
+                        stripos($name, 'traffic') !== false || stripos($name, 'bandwidth') !== false) {
+                        $metrics['network'] = [
+                            'itemid' => $item['itemid'],
+                            'name' => $item['name'],
+                            'value' => $item['lastvalue'],
+                            'units' => $item['units']
                         ];
-                        error_log("  -> Selected Disk: {$diskCandidates[0]['name']} (bytes fallback)");
                     }
                 }
+            }
+            
+            // Now select best disk metric from candidates
+            if (!empty($diskCandidates) && !isset($metrics['disk'])) {
+                // Priority 1: Find percentage metric
+                foreach ($diskCandidates as $candidate) {
+                    if ($candidate['units'] === '%' || stripos($candidate['name'], 'in %') !== false) {
+                        $metrics['disk'] = [
+                            'itemid' => $candidate['itemid'],
+                            'name' => $candidate['name'],
+                            'value' => $candidate['lastvalue'],
+                            'units' => $candidate['units']
+                        ];
+                        break;
+                    }
+                }
+                
+                // Priority 2: If no percentage found, use bytes
+                if (!isset($metrics['disk']) && !empty($diskCandidates)) {
+                    $metrics['disk'] = [
+                        'itemid' => $diskCandidates[0]['itemid'],
+                        'name' => $diskCandidates[0]['name'],
+                        'value' => $diskCandidates[0]['lastvalue'],
+                        'units' => $diskCandidates[0]['units']
+                    ];
+                }
+            }
                 
                 if (!empty($metrics)) {
                     $hostsWithMetrics[] = [
