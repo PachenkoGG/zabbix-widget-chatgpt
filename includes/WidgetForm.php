@@ -40,12 +40,13 @@ class WidgetForm extends CWidgetForm
                 (new CWidgetFieldSelect('model', WidgetTranslator::translate('form.model'), [
                         0 => 'GPT-4o',
                         1 => 'GPT-4o Mini',
-                        2 => 'GPT-4 Turbo',
-                        3 => 'GPT-4',
-                        4 => 'GPT-3.5 Turbo',
-                        5 => 'GPT-3.5 Turbo 16K',
-                        6 => 'O1',
-                        7 => 'O1 Mini',
+                        2 => 'GPT-3.5 Turbo',
+                        3 => 'O1',
+                        4 => 'O3 Mini',
+                        5 => 'GPT-4.1',
+                        6 => 'GPT-4.1 Mini',
+                        7 => 'GPT-5',
+                        8 => 'GPT-5 Mini',
                     ]))
                     ->setDefault(1)
                     ->setFlags(CWidgetField::FLAG_LABEL_ASTERISK)

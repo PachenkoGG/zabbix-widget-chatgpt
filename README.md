@@ -7,12 +7,13 @@ Advanced AI-powered chat widget for Zabbix dashboards with multiple OpenAI model
 ✅ **Multiple OpenAI Model Selection**
 - GPT-4o
 - GPT-4o Mini  
-- GPT-4 Turbo
-- GPT-4
 - GPT-3.5 Turbo
-- GPT-3.5 Turbo 16K
 - O1
-- O1 Mini
+- O3 Mini
+- GPT-4.1
+- GPT-4.1 Mini
+- GPT-5
+- GPT-5 Mini
 
 ✅ **Advanced Features**
 - Conversation history with localStorage

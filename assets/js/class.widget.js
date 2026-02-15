@@ -8,12 +8,13 @@ class CWidgetOpenAIAssistant extends CWidget {
     modelMap = {
         0: 'gpt-4o',
         1: 'gpt-4o-mini',
-        2: 'gpt-4-turbo',
-        3: 'gpt-4',
-        4: 'gpt-3.5-turbo',
-        5: 'gpt-3.5-turbo-16k',
-        6: 'o1',
-        7: 'o1-mini'
+        2: 'gpt-3.5-turbo',
+        3: 'o1',
+        4: 'o3-mini',
+        5: 'gpt-4.1',
+        6: 'gpt-4.1-mini',
+        7: 'gpt-5',
+        8: 'gpt-5-mini'
     };
 
     apiToken = this._fields.token;
