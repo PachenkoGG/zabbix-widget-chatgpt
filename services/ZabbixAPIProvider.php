@@ -234,14 +234,25 @@ class ZabbixAPIProvider
                 'limit' => $limit
             ]);
             
+            error_log('=== DEBUG: Host Items ===');
+            
             // Get key metrics for each host
             $hostsWithMetrics = [];
             foreach ($hosts as $host) {
                 $metrics = [];
                 
+                error_log("Host: {$host['name']} ({$host['host']})");
+                error_log("Total items: " . count($host['items']));
+                
                 foreach ($host['items'] as $item) {
                     $key = $item['key_'];
                     $name = strtolower($item['name']);
+                    
+                    // Log disk-related items
+                    if (stripos($key, 'disk') !== false || stripos($key, 'vfs.fs') !== false || 
+                        stripos($name, 'disk') !== false || stripos($name, 'space') !== false) {
+                        error_log("  - Disk item: {$item['name']} | key: {$item['key_']} | value: {$item['lastvalue']} | units: {$item['units']}");
+                    }
                     
                     // Match common metrics - prioritize percentage/utilization metrics
                     
