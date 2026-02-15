@@ -74,7 +74,8 @@
 /* Message Container */
 .chat-message {
     display: flex;
-    gap: 12px;
+    flex-direction: column;
+    gap: 6px;
     animation: fadeIn 0.3s ease;
 }
 
@@ -89,38 +90,50 @@
 
 /* User messages - RIGHT side */
 .chat-message.user {
-    justify-content: flex-end;
+    align-items: flex-end;
 }
 
 /* Bot messages - LEFT side */
 .chat-message.bot {
-    justify-content: flex-start;
+    align-items: flex-start;
+}
+
+/* Message header with name and avatar */
+.chat-message-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.chat-message.user .chat-message-header {
+    flex-direction: row-reverse;
+}
+
+/* Message sender name */
+.chat-message-sender {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #999;
 }
 
 /* Avatar */
 .chat-message-avatar {
-    width: 32px;
-    height: 32px;
+    width: 28px;
+    height: 28px;
     border-radius: 4px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
-    order: 0;
 }
 
 /* User avatar - Simple icon */
 .chat-message.user .chat-message-avatar {
     background: #444;
     color: #fff;
-    order: 1;
-}
-
-.chat-message.user .chat-message-avatar::before {
-    content: "👤";
-    font-size: 16px;
 }
 
 /* Bot avatar - Zabbix Z logo */
@@ -129,17 +142,12 @@
     color: #fff;
 }
 
-.chat-message.bot .chat-message-avatar::before {
-    content: "Z";
-    font-size: 20px;
-}
-
 /* Message content wrapper */
 .chat-message-content {
-    max-width: 70%;
-    padding: 12px 16px;
-    line-height: 1.6;
-    font-size: 0.95rem;
+    max-width: 75%;
+    padding: 14px 18px;
+    line-height: 1.7;
+    font-size: 1.05rem;
     word-wrap: break-word;
     border-radius: 8px;
 }
@@ -147,15 +155,13 @@
 /* User message bubble - Simple dark */
 .chat-message.user .chat-message-content {
     background: #2f2f2f;
-    color: #ececec;
-    order: 0;
+    color: #f0f0f0;
 }
 
 /* Bot message bubble - Lighter background */
 .chat-message.bot .chat-message-content {
     background: #2b2b2b;
-    color: #ececec;
-    order: 1;
+    color: #f0f0f0;
 }
 
 /* Better text readability */
@@ -345,12 +351,15 @@
 }
 
 /* Loading animation - simple dots */
-.chat-message.bot .loading {
+.chat-message .dot-flashing {
     display: inline-flex;
     gap: 4px;
+    align-items: center;
 }
 
-.chat-message.bot .loading span {
+.chat-message .dot-flashing::before,
+.chat-message .dot-flashing::after {
+    content: '';
     width: 6px;
     height: 6px;
     background: #666;
@@ -358,11 +367,11 @@
     animation: bounce 1.4s infinite ease-in-out both;
 }
 
-.chat-message.bot .loading span:nth-child(1) {
+.chat-message .dot-flashing::before {
     animation-delay: -0.32s;
 }
 
-.chat-message.bot .loading span:nth-child(2) {
+.chat-message .dot-flashing::after {
     animation-delay: -0.16s;
 }
 

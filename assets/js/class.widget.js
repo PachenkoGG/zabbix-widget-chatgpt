@@ -335,14 +335,18 @@ class CWidgetOpenAIAssistant extends CWidget {
         }
 
         const message = document.createElement('div');
-        message.classList.add('chat-log-message', `chat-log-message-${sender}`);
+        message.classList.add('chat-message', sender);
 
+        const senderName = sender === 'user' ? 'You' : 'Zabbix AI';
+        const avatar = sender === 'user' ? '👤' : 'Z';
+        
         message.insertAdjacentHTML(
             'beforeend',
-            `<div class="chat-log-message-author chat-log-message-author-${sender}">
-                <span class="author-icon">${sender === 'user' ? '👤' : '🤖'}</span>
+            `<div class="chat-message-header">
+                <div class="chat-message-avatar">${avatar}</div>
+                <span class="chat-message-sender">${senderName}</span>
              </div>
-             <div class="chat-log-message-text chat-log-message-text-${sender}">
+             <div class="chat-message-content">
                 <div class="dot-flashing"></div>
              </div>`
         );
@@ -350,7 +354,7 @@ class CWidgetOpenAIAssistant extends CWidget {
         this.chatLog.appendChild(message);
         this.chatLog.scrollTop = this.chatLog.scrollHeight;
 
-        return message.querySelector('.chat-log-message-text');
+        return message.querySelector('.chat-message-content');
     }
 
     addCopyButtonsToCodeBlocks(element) {
