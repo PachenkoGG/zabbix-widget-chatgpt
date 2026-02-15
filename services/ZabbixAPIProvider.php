@@ -115,7 +115,45 @@ class ZabbixAPIProvider
     }
     
     /**
-     * Get host items (metrics) with latest data
+     * Get item history with statistics
+     */
+    public function getItemHistoryStats($itemId, $periodSeconds = 7200) {
+        try {
+            $timeFrom = time() - $periodSeconds;
+            
+            $history = $this->apiRequest('history.get', [
+                'output' => 'extend',
+                'itemids' => $itemId,
+                'time_from' => $timeFrom,
+                'sortfield' => 'clock',
+                'sortorder' => 'ASC',
+                'limit' => 1000
+            ]);
+            
+            if (empty($history)) {
+                return null;
+            }
+            
+            // Calculate statistics
+            $values = array_map(function($h) { return floatval($h['value']); }, $history);
+            
+            return [
+                'min' => min($values),
+                'max' => max($values),
+                'avg' => array_sum($values) / count($values),
+                'current' => end($values),
+                'count' => count($values),
+                'period_hours' => $periodSeconds / 3600
+            ];
+            
+        } catch (\Exception $e) {
+            error_log('ZabbixAPIProvider::getItemHistoryStats error: ' . $e->getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Get host items (metrics) with latest data AND history
      */
     public function getHostMetrics($hostName, $limit = 10) {
         try {
@@ -206,25 +244,34 @@ class ZabbixAPIProvider
                     
                     // Match common metrics
                     if (stripos($key, 'cpu') !== false || stripos($item['name'], 'CPU') !== false) {
-                        $metrics['cpu'] = [
-                            'name' => $item['name'],
-                            'value' => $item['lastvalue'],
-                            'units' => $item['units']
-                        ];
+                        if (!isset($metrics['cpu'])) { // Take first match only
+                            $metrics['cpu'] = [
+                                'itemid' => $item['itemid'],
+                                'name' => $item['name'],
+                                'value' => $item['lastvalue'],
+                                'units' => $item['units']
+                            ];
+                        }
                     }
-                    elseif (stripos($key, 'memory') !== false || stripos($item['name'], 'Memory') !== false) {
-                        $metrics['memory'] = [
-                            'name' => $item['name'],
-                            'value' => $item['lastvalue'],
-                            'units' => $item['units']
-                        ];
+                    elseif (stripos($key, 'memory') !== false || stripos($item['name'], 'Memory') !== false || stripos($item['name'], 'RAM') !== false) {
+                        if (!isset($metrics['memory'])) {
+                            $metrics['memory'] = [
+                                'itemid' => $item['itemid'],
+                                'name' => $item['name'],
+                                'value' => $item['lastvalue'],
+                                'units' => $item['units']
+                            ];
+                        }
                     }
-                    elseif (stripos($key, 'disk') !== false || stripos($item['name'], 'Disk') !== false) {
-                        $metrics['disk'] = [
-                            'name' => $item['name'],
-                            'value' => $item['lastvalue'],
-                            'units' => $item['units']
-                        ];
+                    elseif (stripos($key, 'disk') !== false || stripos($item['name'], 'Disk') !== false || stripos($key, 'space') !== false || stripos($item['name'], 'space') !== false) {
+                        if (!isset($metrics['disk'])) {
+                            $metrics['disk'] = [
+                                'itemid' => $item['itemid'],
+                                'name' => $item['name'],
+                                'value' => $item['lastvalue'],
+                                'units' => $item['units']
+                            ];
+                        }
                     }
                 }
                 
@@ -343,7 +390,20 @@ class ZabbixAPIProvider
                     if (!empty($hostData['metrics'])) {
                         foreach ($hostData['metrics'] as $metricType => $metric) {
                             $value = $this->formatMetricValue($metric['value'], $metric['units']);
-                            $context .= "   - {$metric['name']}: {$value}\n";
+                            $context .= "   - {$metric['name']}: {$value}";
+                            
+                            // Add history stats if available
+                            if (isset($metric['itemid'])) {
+                                $stats = $this->getItemHistoryStats($metric['itemid'], 7200); // Last 2 hours
+                                if ($stats) {
+                                    $minVal = $this->formatMetricValue($stats['min'], $metric['units']);
+                                    $maxVal = $this->formatMetricValue($stats['max'], $metric['units']);
+                                    $avgVal = $this->formatMetricValue($stats['avg'], $metric['units']);
+                                    $context .= " (Last 2h: Min={$minVal}, Max={$maxVal}, Avg={$avgVal})";
+                                }
+                            }
+                            
+                            $context .= "\n";
                         }
                     } else {
                         $context .= "   - No metrics available\n";
@@ -353,8 +413,11 @@ class ZabbixAPIProvider
             }
             
             $context .= "\n=== END ZABBIX STATUS ===\n";
-            $context .= "\nNote: You can answer questions about specific hosts, their metrics, problems, and overall infrastructure status.\n";
-            $context .= "If user asks for a specific host's metrics, tell them the available data above or that you need more specific information.\n";
+            $context .= "\n**Important Notes:**\n";
+            $context .= "- Each metric shows: Current value (Last 2h: Min, Max, Avg)\n";
+            $context .= "- You can answer questions about current values and recent trends (last 2 hours)\n";
+            $context .= "- If user asks about specific time periods, use the available 2-hour statistics\n";
+            $context .= "- Example: 'Son 2 saat CPU %X ile %Y arasında değişti, ortalama %Z oldu'\n";
             
             return $context;
             
