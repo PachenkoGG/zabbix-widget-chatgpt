@@ -257,6 +257,9 @@ class ZabbixAPIProvider
                 
                 error_log("Total items: " . count($items));
                 
+                // Collect candidate metrics
+                $diskCandidates = [];
+                
                 foreach ($items as $item) {
                     $key = $item['key_'];
                     $name = strtolower($item['name']);
@@ -265,14 +268,17 @@ class ZabbixAPIProvider
                     if (stripos($key, 'disk') !== false || stripos($key, 'vfs.fs') !== false || 
                         stripos($name, 'disk') !== false || stripos($name, 'space') !== false) {
                         error_log("  - Disk item: {$item['name']} | key: {$item['key_']} | value: {$item['lastvalue']} | units: {$item['units']}");
+                        
+                        // Collect disk candidates for / filesystem
+                        if ((stripos($name, 'fs [/]') !== false || stripos($key, '[/,') !== false) &&
+                            stripos($name, 'used') !== false && stripos($name, 'inode') === false) {
+                            $diskCandidates[] = $item;
+                        }
                     }
                     
-                    // Match common metrics - prioritize percentage/utilization metrics
-                    
-                    // CPU metrics - prefer utilization/usage percentage
+                    // Match CPU metrics
                     if (!isset($metrics['cpu'])) {
                         if (stripos($key, 'cpu') !== false || stripos($name, 'cpu') !== false) {
-                            // Prioritize: utilization > usage > idle (inverted)
                             if (stripos($name, 'utilization') !== false || stripos($name, 'usage') !== false) {
                                 $metrics['cpu'] = [
                                     'itemid' => $item['itemid'],
@@ -280,14 +286,14 @@ class ZabbixAPIProvider
                                     'value' => $item['lastvalue'],
                                     'units' => $item['units']
                                 ];
+                                error_log("  -> Selected CPU: {$item['name']}");
                             }
                         }
                     }
                     
-                    // Memory metrics - prefer utilization percentage
+                    // Match Memory metrics
                     if (!isset($metrics['memory'])) {
                         if (stripos($key, 'memory') !== false || stripos($name, 'memory') !== false || stripos($name, 'ram') !== false) {
-                            // Prioritize: "memory utilization" > "used memory" > others
                             if (stripos($name, 'utilization') !== false || 
                                 stripos($name, 'usage') !== false ||
                                 (stripos($name, 'used') !== false && stripos($name, 'percent') !== false)) {
@@ -297,45 +303,14 @@ class ZabbixAPIProvider
                                     'value' => $item['lastvalue'],
                                     'units' => $item['units']
                                 ];
+                                error_log("  -> Selected Memory: {$item['name']}");
                             }
                         }
                     }
                     
-                    // Disk metrics - prefer percentage over bytes for / filesystem
-                    if (!isset($metrics['disk'])) {
-                        if (stripos($key, 'vfs.fs') !== false || stripos($name, 'space') !== false) {
-                            // Look for "/" filesystem and "used" metrics
-                            if ((stripos($name, 'fs [/]') !== false || stripos($name, 'fs/') !== false || stripos($key, '[/,') !== false) &&
-                                stripos($name, 'inode') === false) { // Exclude inode metrics
-                                
-                                // PRIORITY 1: "used, in %" (percentage)
-                                if ((stripos($name, 'used') !== false || stripos($name, 'utilization') !== false) && 
-                                    (stripos($name, 'in %') !== false || stripos($name, '%') !== false || $item['units'] === '%')) {
-                                    $metrics['disk'] = [
-                                        'itemid' => $item['itemid'],
-                                        'name' => $item['name'],
-                                        'value' => $item['lastvalue'],
-                                        'units' => $item['units']
-                                    ];
-                                    error_log("  -> Selected Disk: {$item['name']} (priority: percentage)");
-                                }
-                                // PRIORITY 2: "used" (bytes) - only if percentage not found
-                                elseif (stripos($name, 'used') !== false && $item['units'] === 'B') {
-                                    $metrics['disk'] = [
-                                        'itemid' => $item['itemid'],
-                                        'name' => $item['name'],
-                                        'value' => $item['lastvalue'],
-                                        'units' => $item['units']
-                                    ];
-                                    error_log("  -> Selected Disk: {$item['name']} (priority: bytes, fallback)");
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Network metrics
+                    // Match Network metrics
                     if (!isset($metrics['network'])) {
-                        if (stripos($key, 'net') !== false || stripos($name, 'network') !== false || 
+                        if (stripos($key, 'net.if') !== false || stripos($name, 'network') !== false || 
                             stripos($name, 'traffic') !== false || stripos($name, 'bandwidth') !== false) {
                             $metrics['network'] = [
                                 'itemid' => $item['itemid'],
@@ -343,7 +318,36 @@ class ZabbixAPIProvider
                                 'value' => $item['lastvalue'],
                                 'units' => $item['units']
                             ];
+                            error_log("  -> Selected Network: {$item['name']}");
                         }
+                    }
+                }
+                
+                // Now select best disk metric from candidates
+                if (!empty($diskCandidates) && !isset($metrics['disk'])) {
+                    // Priority 1: Find percentage metric
+                    foreach ($diskCandidates as $candidate) {
+                        if ($candidate['units'] === '%' || stripos($candidate['name'], 'in %') !== false) {
+                            $metrics['disk'] = [
+                                'itemid' => $candidate['itemid'],
+                                'name' => $candidate['name'],
+                                'value' => $candidate['lastvalue'],
+                                'units' => $candidate['units']
+                            ];
+                            error_log("  -> Selected Disk: {$candidate['name']} (PERCENTAGE - best choice)");
+                            break;
+                        }
+                    }
+                    
+                    // Priority 2: If no percentage found, use bytes
+                    if (!isset($metrics['disk']) && !empty($diskCandidates)) {
+                        $metrics['disk'] = [
+                            'itemid' => $diskCandidates[0]['itemid'],
+                            'name' => $diskCandidates[0]['name'],
+                            'value' => $diskCandidates[0]['lastvalue'],
+                            'units' => $diskCandidates[0]['units']
+                        ];
+                        error_log("  -> Selected Disk: {$diskCandidates[0]['name']} (bytes fallback)");
                     }
                 }
                 
