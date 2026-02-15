@@ -15,21 +15,35 @@ class WidgetView extends CControllerDashboardWidgetView {
         
         // Get Zabbix data if enabled
         $zabbixData = '';
+        
+        // DEBUG: Log field values
+        error_log('=== OpenAI Widget Debug ===');
+        error_log('enable_zabbix_data: ' . var_export($this->fields_values['enable_zabbix_data'] ?? 'NOT SET', true));
+        error_log('zabbix_api_url: ' . var_export($this->fields_values['zabbix_api_url'] ?? 'NOT SET', true));
+        error_log('zabbix_api_token: ' . (isset($this->fields_values['zabbix_api_token']) ? 'SET (length=' . strlen($this->fields_values['zabbix_api_token']) . ')' : 'NOT SET'));
+        
         if (!empty($this->fields_values['enable_zabbix_data'])) {
             try {
                 $apiUrl = $this->fields_values['zabbix_api_url'] ?? '';
                 $apiToken = $this->fields_values['zabbix_api_token'] ?? '';
                 
+                error_log('Attempting to fetch Zabbix data...');
+                error_log('API URL: ' . $apiUrl);
+                
                 if (!empty($apiUrl) && !empty($apiToken)) {
                     $provider = new ZabbixAPIProvider($apiUrl, $apiToken);
                     $zabbixData = $provider->formatForAI();
+                    error_log('Zabbix data fetched successfully! Length: ' . strlen($zabbixData));
                 } else {
-                    error_log('OpenAI Widget: Zabbix API URL or Token not provided');
+                    error_log('ERROR: Zabbix API URL or Token not provided');
                 }
             } catch (\Exception $e) {
-                error_log('OpenAI Widget: Could not fetch Zabbix data - ' . $e->getMessage());
+                error_log('ERROR: Could not fetch Zabbix data - ' . $e->getMessage());
+                error_log('Stack trace: ' . $e->getTraceAsString());
                 $zabbixData = '';
             }
+        } else {
+            error_log('Zabbix data disabled in widget config');
         }
 
         $this->setResponse(new CControllerResponseData([
