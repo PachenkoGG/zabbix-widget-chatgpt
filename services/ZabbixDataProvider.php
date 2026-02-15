@@ -13,17 +13,44 @@ class ZabbixDataProvider
      */
     public static function getProblems($limit = 10) {
         try {
-            // Use Zabbix API directly via API factory
-            $problems = API::Problem()->get([
-                'output' => ['eventid', 'objectid', 'name', 'severity', 'clock'],
-                'selectHosts' => ['hostid', 'host', 'name'],
-                'recent' => true,
-                'sortfield' => ['clock'],
-                'sortorder' => ZBX_SORT_DOWN,
-                'limit' => $limit
-            ]);
+            global $DB;
             
-            return $problems ?: [];
+            if (!isset($DB) || !is_object($DB)) {
+                return [];
+            }
+            
+            // Use direct SQL query
+            $query = 'SELECT p.eventid, p.objectid, p.name, p.severity, p.clock, '.
+                     'h.hostid, h.host, h.name as hostname '.
+                     'FROM problem p '.
+                     'LEFT JOIN triggers t ON p.objectid=t.triggerid '.
+                     'LEFT JOIN functions f ON t.triggerid=f.triggerid '.
+                     'LEFT JOIN items i ON f.itemid=i.itemid '.
+                     'LEFT JOIN hosts h ON i.hostid=h.hostid '.
+                     'WHERE p.source=0 AND p.object=0 '.
+                     'ORDER BY p.clock DESC '.
+                     'LIMIT ' . intval($limit);
+            
+            $result = DBselect($query);
+            $problems = [];
+            
+            while ($row = DBfetch($result)) {
+                $problems[] = [
+                    'eventid' => $row['eventid'],
+                    'objectid' => $row['objectid'],
+                    'name' => $row['name'],
+                    'severity' => $row['severity'],
+                    'clock' => $row['clock'],
+                    'hosts' => [[
+                        'hostid' => $row['hostid'],
+                        'host' => $row['host'],
+                        'name' => $row['hostname']
+                    ]]
+                ];
+            }
+            
+            return $problems;
+            
         } catch (\Exception $e) {
             error_log('ZabbixDataProvider::getProblems error: ' . $e->getMessage());
             return [];
@@ -35,15 +62,45 @@ class ZabbixDataProvider
      */
     public static function getHostsWithProblems($limit = 20) {
         try {
-            $hosts = API::Host()->get([
-                'output' => ['hostid', 'host', 'name', 'status'],
-                'selectGroups' => ['groupid', 'name'],
-                'withProblemsSuppressed' => false,
-                'severities' => [TRIGGER_SEVERITY_WARNING, TRIGGER_SEVERITY_AVERAGE, TRIGGER_SEVERITY_HIGH, TRIGGER_SEVERITY_DISASTER],
-                'limit' => $limit
-            ]);
+            global $DB;
             
-            return $hosts ?: [];
+            if (!isset($DB) || !is_object($DB)) {
+                return [];
+            }
+            
+            // Get hosts with active problems
+            $query = 'SELECT DISTINCT h.hostid, h.host, h.name, h.status, '.
+                     'GROUP_CONCAT(DISTINCT hg.name SEPARATOR ", ") as groups '.
+                     'FROM hosts h '.
+                     'LEFT JOIN hosts_groups hgh ON h.hostid=hgh.hostid '.
+                     'LEFT JOIN hstgrp hg ON hgh.groupid=hg.groupid '.
+                     'WHERE h.hostid IN ('.
+                     '  SELECT DISTINCT i.hostid FROM problem p '.
+                     '  LEFT JOIN triggers t ON p.objectid=t.triggerid '.
+                     '  LEFT JOIN functions f ON t.triggerid=f.triggerid '.
+                     '  LEFT JOIN items i ON f.itemid=i.itemid '.
+                     '  WHERE p.source=0 AND p.object=0 AND p.severity >= 2'.
+                     ') '.
+                     'GROUP BY h.hostid, h.host, h.name, h.status '.
+                     'LIMIT ' . intval($limit);
+            
+            $result = DBselect($query);
+            $hosts = [];
+            
+            while ($row = DBfetch($result)) {
+                $hosts[] = [
+                    'hostid' => $row['hostid'],
+                    'host' => $row['host'],
+                    'name' => $row['name'],
+                    'status' => $row['status'],
+                    'groups' => array_map(function($name) {
+                        return ['name' => trim($name)];
+                    }, explode(',', $row['groups']))
+                ];
+            }
+            
+            return $hosts;
+            
         } catch (\Exception $e) {
             error_log('ZabbixDataProvider::getHostsWithProblems error: ' . $e->getMessage());
             return [];
@@ -55,22 +112,30 @@ class ZabbixDataProvider
      */
     public static function getStatistics() {
         try {
+            global $DB;
+            
+            if (!isset($DB) || !is_object($DB)) {
+                return null;
+            }
+            
             // Total hosts
-            $totalHosts = API::Host()->get([
-                'countOutput' => true
-            ]);
+            $result = DBselect('SELECT COUNT(*) as cnt FROM hosts WHERE status=0');
+            $row = DBfetch($result);
+            $totalHosts = $row['cnt'];
             
             // Hosts with problems
-            $hostsWithProblems = API::Host()->get([
-                'countOutput' => true,
-                'withProblemsSuppressed' => false
-            ]);
+            $result = DBselect(
+                'SELECT COUNT(DISTINCT i.hostid) as cnt FROM problem p '.
+                'LEFT JOIN triggers t ON p.objectid=t.triggerid '.
+                'LEFT JOIN functions f ON t.triggerid=f.triggerid '.
+                'LEFT JOIN items i ON f.itemid=i.itemid '.
+                'WHERE p.source=0 AND p.object=0'
+            );
+            $row = DBfetch($result);
+            $hostsWithProblems = $row['cnt'];
             
             // Active problems by severity
-            $problems = API::Problem()->get([
-                'recent' => true,
-                'output' => ['severity']
-            ]);
+            $result = DBselect('SELECT severity, COUNT(*) as cnt FROM problem WHERE source=0 AND object=0 GROUP BY severity');
             
             $severityCounts = [
                 'disaster' => 0,
@@ -80,13 +145,15 @@ class ZabbixDataProvider
                 'information' => 0
             ];
             
-            foreach ($problems as $problem) {
-                switch ($problem['severity']) {
-                    case 5: $severityCounts['disaster']++; break;
-                    case 4: $severityCounts['high']++; break;
-                    case 3: $severityCounts['average']++; break;
-                    case 2: $severityCounts['warning']++; break;
-                    case 1: $severityCounts['information']++; break;
+            $totalProblems = 0;
+            while ($row = DBfetch($result)) {
+                $totalProblems += $row['cnt'];
+                switch ($row['severity']) {
+                    case 5: $severityCounts['disaster'] = $row['cnt']; break;
+                    case 4: $severityCounts['high'] = $row['cnt']; break;
+                    case 3: $severityCounts['average'] = $row['cnt']; break;
+                    case 2: $severityCounts['warning'] = $row['cnt']; break;
+                    case 1: $severityCounts['information'] = $row['cnt']; break;
                 }
             }
             
@@ -94,9 +161,10 @@ class ZabbixDataProvider
                 'total_hosts' => $totalHosts,
                 'hosts_with_problems' => $hostsWithProblems,
                 'severity_counts' => $severityCounts,
-                'total_problems' => count($problems)
+                'total_problems' => $totalProblems
             ];
         } catch (\Exception $e) {
+            error_log('ZabbixDataProvider::getStatistics error: ' . $e->getMessage());
             return null;
         }
     }
@@ -106,8 +174,10 @@ class ZabbixDataProvider
      */
     public static function formatForAI() {
         // Check if we're in Zabbix environment
-        if (!function_exists('API') || !class_exists('API')) {
-            error_log('OpenAI Widget: API class not available - Zabbix data disabled');
+        global $DB;
+        
+        if (!isset($DB) || !is_object($DB)) {
+            error_log('OpenAI Widget: Database not available - Zabbix data disabled');
             return '';
         }
         
