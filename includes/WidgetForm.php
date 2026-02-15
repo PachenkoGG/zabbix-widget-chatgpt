@@ -38,16 +38,16 @@ class WidgetForm extends CWidgetForm
             )
             ->addField(
                 (new CWidgetFieldSelect('model', WidgetTranslator::translate('form.model'), [
-                        'gpt-4o' => 'GPT-4o',
-                        'gpt-4o-mini' => 'GPT-4o Mini',
-                        'gpt-4-turbo' => 'GPT-4 Turbo',
-                        'gpt-4' => 'GPT-4',
-                        'gpt-3.5-turbo' => 'GPT-3.5 Turbo',
-                        'gpt-3.5-turbo-16k' => 'GPT-3.5 Turbo 16K',
-                        'o1' => 'O1',
-                        'o1-mini' => 'O1 Mini',
+                        0 => 'GPT-4o',
+                        1 => 'GPT-4o Mini',
+                        2 => 'GPT-4 Turbo',
+                        3 => 'GPT-4',
+                        4 => 'GPT-3.5 Turbo',
+                        5 => 'GPT-3.5 Turbo 16K',
+                        6 => 'O1',
+                        7 => 'O1 Mini',
                     ]))
-                    ->setDefault('gpt-4o-mini')
+                    ->setDefault(1)
                     ->setFlags(CWidgetField::FLAG_LABEL_ASTERISK)
             )
             ->addField(

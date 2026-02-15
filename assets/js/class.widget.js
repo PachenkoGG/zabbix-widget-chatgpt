@@ -4,9 +4,21 @@
 **/
 
 class CWidgetOpenAIAssistant extends CWidget {
+    // Model mapping: integer to OpenAI model name
+    modelMap = {
+        0: 'gpt-4o',
+        1: 'gpt-4o-mini',
+        2: 'gpt-4-turbo',
+        3: 'gpt-4',
+        4: 'gpt-3.5-turbo',
+        5: 'gpt-3.5-turbo-16k',
+        6: 'o1',
+        7: 'o1-mini'
+    };
+
     apiToken = this._fields.token;
     apiEndpoint = this._fields.endpoint;
-    selectedModel = this._fields.model;
+    selectedModel = this.modelMap[this._fields.model] || 'gpt-4o-mini';
     temperature = parseFloat(this._fields.temperature) || 0.7;
     topP = parseFloat(this._fields.top_p) || 1;
     maxTokens = parseInt(this._fields.max_tokens) || 2048;
