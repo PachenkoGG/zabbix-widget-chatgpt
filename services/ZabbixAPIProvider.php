@@ -301,20 +301,34 @@ class ZabbixAPIProvider
                         }
                     }
                     
-                    // Disk metrics - prefer usage/utilization for / filesystem
+                    // Disk metrics - prefer percentage over bytes for / filesystem
                     if (!isset($metrics['disk'])) {
                         if (stripos($key, 'vfs.fs') !== false || stripos($name, 'space') !== false) {
-                            // Look for "/" filesystem and "used" or "utilization"
-                            if ((stripos($name, 'fs /') !== false || stripos($name, 'fs/') !== false || stripos($key, '[/,') !== false || stripos($key, '[/]') !== false) &&
-                                (stripos($name, 'used') !== false || stripos($name, 'utilization') !== false) &&
+                            // Look for "/" filesystem and "used" metrics
+                            if ((stripos($name, 'fs [/]') !== false || stripos($name, 'fs/') !== false || stripos($key, '[/,') !== false) &&
                                 stripos($name, 'inode') === false) { // Exclude inode metrics
-                                $metrics['disk'] = [
-                                    'itemid' => $item['itemid'],
-                                    'name' => $item['name'],
-                                    'value' => $item['lastvalue'],
-                                    'units' => $item['units']
-                                ];
-                                error_log("  -> Selected Disk: {$item['name']}");
+                                
+                                // PRIORITY 1: "used, in %" (percentage)
+                                if ((stripos($name, 'used') !== false || stripos($name, 'utilization') !== false) && 
+                                    (stripos($name, 'in %') !== false || stripos($name, '%') !== false || $item['units'] === '%')) {
+                                    $metrics['disk'] = [
+                                        'itemid' => $item['itemid'],
+                                        'name' => $item['name'],
+                                        'value' => $item['lastvalue'],
+                                        'units' => $item['units']
+                                    ];
+                                    error_log("  -> Selected Disk: {$item['name']} (priority: percentage)");
+                                }
+                                // PRIORITY 2: "used" (bytes) - only if percentage not found
+                                elseif (stripos($name, 'used') !== false && $item['units'] === 'B') {
+                                    $metrics['disk'] = [
+                                        'itemid' => $item['itemid'],
+                                        'name' => $item['name'],
+                                        'value' => $item['lastvalue'],
+                                        'units' => $item['units']
+                                    ];
+                                    error_log("  -> Selected Disk: {$item['name']} (priority: bytes, fallback)");
+                                }
                             }
                         }
                     }
