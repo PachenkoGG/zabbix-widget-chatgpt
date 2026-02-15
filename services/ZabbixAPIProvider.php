@@ -284,15 +284,26 @@ class ZabbixAPIProvider
             
             // Collect candidate metrics
             $diskCandidates = [];
+            $diskTotalCandidates = [];
             
             foreach ($items as $item) {
                 $key = $item['key_'];
                 $name = strtolower($item['name']);
                 
-                // Collect disk candidates for / filesystem
+                // Collect disk USAGE candidates for / filesystem
                 if ((stripos($name, 'fs [/]') !== false || stripos($key, '[/,') !== false) &&
                     stripos($name, 'used') !== false && stripos($name, 'inode') === false) {
                     $diskCandidates[] = $item;
+                }
+                
+                // Collect disk TOTAL SIZE candidates for / filesystem
+                if ((stripos($name, 'fs [/]') !== false || stripos($key, '[/,') !== false) &&
+                    (stripos($name, 'total') !== false || stripos($name, 'size') !== false) && 
+                    stripos($name, 'used') === false && 
+                    stripos($name, 'free') === false &&
+                    stripos($name, 'available') === false &&
+                    stripos($name, 'inode') === false) {
+                    $diskTotalCandidates[] = $item;
                 }
                     
                 // Match CPU utilization metrics
@@ -340,13 +351,12 @@ class ZabbixAPIProvider
                     }
                 }
                 
-                // Match Total Memory
+                // Match Total Memory (ONLY "Total memory", NOT "Available memory"!)
                 if (!isset($metrics['memory_total'])) {
                     if ((stripos($key, 'vm.memory.size[total]') !== false || 
-                         stripos($key, 'vm.memory.size[available]') !== false ||
-                         stripos($name, 'total memory') !== false ||
-                         stripos($name, 'available memory') !== false) &&
-                        stripos($name, 'utilization') === false) {
+                         stripos($name, 'total memory') !== false) &&
+                        stripos($name, 'utilization') === false &&
+                        stripos($name, 'available') === false) {  // Exclude "Available memory"
                         $metrics['memory_total'] = [
                             'itemid' => $item['itemid'],
                             'name' => $item['name'],
@@ -399,12 +409,12 @@ class ZabbixAPIProvider
                 }
             }
             
-            // Now select best disk metric from candidates
-            if (!empty($diskCandidates) && !isset($metrics['disk'])) {
+            // Now select best disk USAGE metric from candidates
+            if (!empty($diskCandidates) && !isset($metrics['disk_usage'])) {
                 // Priority 1: Find percentage metric
                 foreach ($diskCandidates as $candidate) {
                     if ($candidate['units'] === '%' || stripos($candidate['name'], 'in %') !== false) {
-                        $metrics['disk'] = [
+                        $metrics['disk_usage'] = [
                             'itemid' => $candidate['itemid'],
                             'name' => $candidate['name'],
                             'value' => $candidate['lastvalue'],
@@ -415,13 +425,29 @@ class ZabbixAPIProvider
                 }
                 
                 // Priority 2: If no percentage found, use bytes
-                if (!isset($metrics['disk']) && !empty($diskCandidates)) {
-                    $metrics['disk'] = [
+                if (!isset($metrics['disk_usage']) && !empty($diskCandidates)) {
+                    $metrics['disk_usage'] = [
                         'itemid' => $diskCandidates[0]['itemid'],
                         'name' => $diskCandidates[0]['name'],
                         'value' => $diskCandidates[0]['lastvalue'],
                         'units' => $diskCandidates[0]['units']
                     ];
+                }
+            }
+            
+            // Now select disk TOTAL SIZE metric
+            if (!empty($diskTotalCandidates) && !isset($metrics['disk_total'])) {
+                // Find "Total" metric (should be in bytes)
+                foreach ($diskTotalCandidates as $candidate) {
+                    if ($candidate['units'] === 'B' || stripos($candidate['name'], 'total') !== false) {
+                        $metrics['disk_total'] = [
+                            'itemid' => $candidate['itemid'],
+                            'name' => $candidate['name'],
+                            'value' => $candidate['lastvalue'],
+                            'units' => $candidate['units']
+                        ];
+                        break;
+                    }
                 }
             }
                 
@@ -551,7 +577,7 @@ class ZabbixAPIProvider
                             // Add history stats ONLY for usage/utilization metrics (not for static info like CPU cores, RAM total, OS, uptime)
                             $isUsageMetric = (stripos($metricType, 'usage') !== false || 
                                              stripos($metricType, 'utilization') !== false ||
-                                             $metricType === 'disk' ||
+                                             $metricType === 'disk_usage' ||
                                              $metricType === 'network');
                             
                             if ($isUsageMetric && isset($metric['itemid'])) {
