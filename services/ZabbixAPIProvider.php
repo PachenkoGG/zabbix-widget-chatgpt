@@ -64,14 +64,34 @@ class ZabbixAPIProvider
      */
     public function getProblems($limit = 10) {
         try {
-            return $this->apiRequest('problem.get', [
+            $problems = $this->apiRequest('problem.get', [
                 'output' => ['eventid', 'objectid', 'name', 'severity', 'clock'],
-                'selectHosts' => ['hostid', 'host', 'name'],
                 'recent' => true,
                 'sortfield' => ['clock'],
                 'sortorder' => 'DESC',
                 'limit' => $limit
             ]);
+            
+            // Get host info separately for each problem
+            foreach ($problems as &$problem) {
+                try {
+                    $triggers = $this->apiRequest('trigger.get', [
+                        'output' => ['triggerid'],
+                        'triggerids' => $problem['objectid'],
+                        'selectHosts' => ['hostid', 'host', 'name'],
+                        'limit' => 1
+                    ]);
+                    
+                    if (!empty($triggers[0]['hosts'])) {
+                        $problem['hosts'] = $triggers[0]['hosts'];
+                    }
+                } catch (\Exception $e) {
+                    error_log('Could not fetch host for problem: ' . $e->getMessage());
+                    $problem['hosts'] = [['name' => 'Unknown']];
+                }
+            }
+            
+            return $problems;
         } catch (\Exception $e) {
             error_log('ZabbixAPIProvider::getProblems error: ' . $e->getMessage());
             return [];

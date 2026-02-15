@@ -46,6 +46,16 @@ class WidgetView extends CControllerDashboardWidgetView {
             error_log('Zabbix data disabled in widget config');
         }
 
+        error_log('Final zabbix_data length: ' . strlen($zabbixData));
+        error_log('Response data keys: ' . implode(', ', array_keys([
+            'name' => $this->getInput('name', $this->widget->getName()),
+            'fields_values' => $this->fields_values,
+            'zabbix_data' => $zabbixData,
+            'user' => [
+                'debug_mode' => $this->getDebugMode()
+            ]
+        ])));
+
         $this->setResponse(new CControllerResponseData([
             'name' => $this->getInput('name', $this->widget->getName()),
             'fields_values' => $this->fields_values,
