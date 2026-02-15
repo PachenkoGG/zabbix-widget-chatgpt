@@ -42,11 +42,21 @@ class CWidgetOpenAIAssistant extends CWidget {
 
         // Store Zabbix data if available (with error handling)
         try {
+            console.log('=== OpenAI Widget Debug ===');
+            console.log('Response:', response);
+            console.log('Response body:', response.body);
+            console.log('Zabbix data available:', response && response.body && response.body.zabbix_data);
+            
             if (response && response.body && response.body.zabbix_data) {
                 this.zabbixData = response.body.zabbix_data;
+                console.log('Zabbix data loaded! Length:', this.zabbixData.length);
+                console.log('Zabbix data preview:', this.zabbixData.substring(0, 200));
+            } else {
+                console.log('No Zabbix data in response');
+                this.zabbixData = '';
             }
         } catch (e) {
-            console.warn('Could not load Zabbix data:', e);
+            console.error('Error loading Zabbix data:', e);
             this.zabbixData = '';
         }
 
