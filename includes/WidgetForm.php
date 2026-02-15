@@ -81,6 +81,13 @@ class WidgetForm extends CWidgetForm
                     ]))
                     ->setDefault(0)
             )
+            ->addField(
+                (new CWidgetFieldTextBox('zabbix_api_url', WidgetTranslator::translate('form.zabbix_api_url')))
+                    ->setDefault('http://localhost/zabbix/api_jsonrpc.php')
+            )
+            ->addField(
+                (new CWidgetFieldTextBox('zabbix_api_token', WidgetTranslator::translate('form.zabbix_api_token')))
+            )
         ;
     }
 }

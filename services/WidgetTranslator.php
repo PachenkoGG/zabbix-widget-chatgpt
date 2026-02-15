@@ -26,6 +26,8 @@ class WidgetTranslator
             'form.enable_zabbix_data' => _('Include Zabbix Data'),
             'form.enable_zabbix_data.option.yes' => _('Yes'),
             'form.enable_zabbix_data.option.no' => _('No'),
+            'form.zabbix_api_url' => _('Zabbix API URL'),
+            'form.zabbix_api_token' => _('Zabbix API Token'),
             'form.advanced-configuration' => _('Advanced Configuration'),
             'view.message.placeholder' => _('Type your message here...'),
             'view.clear.button' => _('Clear History'),

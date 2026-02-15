@@ -7,19 +7,26 @@ namespace Modules\OpenAIAssistant\Actions;
 
 use CControllerDashboardWidgetView;
 use CControllerResponseData;
-use Modules\OpenAIAssistant\Services\ZabbixDataProvider;
+use Modules\OpenAIAssistant\Services\ZabbixAPIProvider;
 
 class WidgetView extends CControllerDashboardWidgetView {
 
     protected function doAction(): void {
         
-        // Get Zabbix data if enabled (with error handling)
+        // Get Zabbix data if enabled
         $zabbixData = '';
         if (!empty($this->fields_values['enable_zabbix_data'])) {
             try {
-                $zabbixData = ZabbixDataProvider::formatForAI();
+                $apiUrl = $this->fields_values['zabbix_api_url'] ?? '';
+                $apiToken = $this->fields_values['zabbix_api_token'] ?? '';
+                
+                if (!empty($apiUrl) && !empty($apiToken)) {
+                    $provider = new ZabbixAPIProvider($apiUrl, $apiToken);
+                    $zabbixData = $provider->formatForAI();
+                } else {
+                    error_log('OpenAI Widget: Zabbix API URL or Token not provided');
+                }
             } catch (\Exception $e) {
-                // Silently fail - widget should still work without Zabbix data
                 error_log('OpenAI Widget: Could not fetch Zabbix data - ' . $e->getMessage());
                 $zabbixData = '';
             }

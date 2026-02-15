@@ -19,6 +19,18 @@ use Modules\OpenAIAssistant\Widget;
             new CWidgetFieldSelectView($data['fields']['enable_zabbix_data'])
         )
         ->addField(
+            (new CWidgetFieldTextBoxView($data['fields']['zabbix_api_url']))
+                ->setFieldHint(
+                    makeHelpIcon(_('Zabbix API endpoint URL. Example: http://localhost/zabbix/api_jsonrpc.php'), 'icon-help')
+                )
+        )
+        ->addField(
+            (new CWidgetFieldTextBoxView($data['fields']['zabbix_api_token']))
+                ->setFieldHint(
+                    makeHelpIcon(_('Zabbix API token from Administration → API tokens. Required if Zabbix Data is enabled.'), 'icon-help')
+                )
+        )
+        ->addField(
             new CWidgetFieldSelectView($data['fields']['service'])
         )
         ->addField(
