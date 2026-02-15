@@ -137,13 +137,21 @@ class CWidgetOpenAIAssistant extends CWidget {
 
         // Add Zabbix data as system context if enabled
         if (this.enableZabbixData && this.zabbixData) {
+            console.log('🔵 Adding Zabbix data to AI context...');
+            console.log('Zabbix data length:', this.zabbixData.length);
+            console.log('Zabbix data preview:', this.zabbixData.substring(0, 300));
             messages.push({
                 role: 'system',
                 content: this.zabbixData
             });
+        } else {
+            console.log('🔴 Zabbix data NOT added. enableZabbixData:', this.enableZabbixData, 'zabbixData length:', this.zabbixData.length);
         }
 
         messages.push(...this.conversationHistory);
+        
+        console.log('📤 Sending to AI - Total messages:', messages.length);
+        console.log('Message structure:', messages.map(m => `${m.role}: ${m.content.substring(0, 50)}...`));
 
         try {
             // Build request body
