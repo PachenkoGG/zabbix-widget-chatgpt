@@ -13,20 +13,13 @@ class ZabbixDataProvider
      */
     public static function getProblems($limit = 10) {
         try {
-            // Check if CAPIManager exists
-            if (!class_exists('\CAPIManager')) {
-                return [];
-            }
-            
-            // Use Zabbix API Manager
-            $api = new \CAPIManager();
-            
-            $problems = $api->call('problem.get', [
+            // Use Zabbix API directly via API factory
+            $problems = API::Problem()->get([
                 'output' => ['eventid', 'objectid', 'name', 'severity', 'clock'],
                 'selectHosts' => ['hostid', 'host', 'name'],
                 'recent' => true,
                 'sortfield' => ['clock'],
-                'sortorder' => 'DESC',
+                'sortorder' => ZBX_SORT_DOWN,
                 'limit' => $limit
             ]);
             
@@ -42,18 +35,11 @@ class ZabbixDataProvider
      */
     public static function getHostsWithProblems($limit = 20) {
         try {
-            // Check if CAPIManager exists
-            if (!class_exists('\CAPIManager')) {
-                return [];
-            }
-            
-            $api = new \CAPIManager();
-            
-            $hosts = $api->call('host.get', [
+            $hosts = API::Host()->get([
                 'output' => ['hostid', 'host', 'name', 'status'],
                 'selectGroups' => ['groupid', 'name'],
                 'withProblemsSuppressed' => false,
-                'severities' => [2, 3, 4, 5], // Warning and above
+                'severities' => [TRIGGER_SEVERITY_WARNING, TRIGGER_SEVERITY_AVERAGE, TRIGGER_SEVERITY_HIGH, TRIGGER_SEVERITY_DISASTER],
                 'limit' => $limit
             ]);
             
@@ -69,26 +55,19 @@ class ZabbixDataProvider
      */
     public static function getStatistics() {
         try {
-            // Check if CAPIManager exists
-            if (!class_exists('\CAPIManager')) {
-                return null;
-            }
-            
-            $api = new \CAPIManager();
-            
             // Total hosts
-            $totalHosts = $api->call('host.get', [
+            $totalHosts = API::Host()->get([
                 'countOutput' => true
             ]);
             
             // Hosts with problems
-            $hostsWithProblems = $api->call('host.get', [
+            $hostsWithProblems = API::Host()->get([
                 'countOutput' => true,
                 'withProblemsSuppressed' => false
             ]);
             
             // Active problems by severity
-            $problems = $api->call('problem.get', [
+            $problems = API::Problem()->get([
                 'recent' => true,
                 'output' => ['severity']
             ]);
@@ -127,8 +106,8 @@ class ZabbixDataProvider
      */
     public static function formatForAI() {
         // Check if we're in Zabbix environment
-        if (!class_exists('\CAPIManager')) {
-            error_log('OpenAI Widget: CAPIManager class not found - Zabbix data disabled');
+        if (!function_exists('API') || !class_exists('API')) {
+            error_log('OpenAI Widget: API class not available - Zabbix data disabled');
             return '';
         }
         
