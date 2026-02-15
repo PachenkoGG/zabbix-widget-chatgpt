@@ -45,7 +45,7 @@ Choose from 8 different OpenAI models:
 ### Option 1: Automatic (Linux)
 
 ```bash
-cd zabbix-widget
+cd zabbix-widget-chatgpt
 sudo chmod +x install.sh
 sudo ./install.sh
 ```
@@ -54,7 +54,7 @@ sudo ./install.sh
 
 ```bash
 # Copy widget to Zabbix modules directory
-sudo cp -r zabbix-widget /usr/share/zabbix/modules/openai-assistant
+sudo cp -r zabbix-widget-chatgpt /usr/share/zabbix/modules/openai-assistant
 
 # Set permissions
 sudo chown -R www-data:www-data /usr/share/zabbix/modules/openai-assistant
@@ -67,7 +67,7 @@ sudo systemctl restart apache2
 
 ### Option 3: Windows/Development
 
-1. Copy the `zabbix-widget` folder to your Zabbix installation
+1. Copy the `zabbix-widget-chatgpt` folder to your Zabbix installation
 2. Typically: `C:\Program Files\Zabbix\ui\modules\`
 3. Restart Zabbix services
 

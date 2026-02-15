@@ -35,7 +35,7 @@ OpenAI Assistant Widget, Zabbix 7.0 dashboard'unuza yapay zeka desteği getiren 
 #### Linux Otomatik Kurulum
 
 ```bash
-cd zabbix-widget
+cd zabbix-widget-chatgpt
 sudo chmod +x install.sh
 sudo ./install.sh
 ```
@@ -44,7 +44,7 @@ sudo ./install.sh
 
 ```bash
 # Widget'ı Zabbix modül dizinine kopyalayın
-sudo cp -r zabbix-widget /usr/share/zabbix/modules/openai-assistant
+sudo cp -r zabbix-widget-chatgpt /usr/share/zabbix/modules/openai-assistant
 
 # İzinleri ayarlayın
 sudo chown -R www-data:www-data /usr/share/zabbix/modules/openai-assistant

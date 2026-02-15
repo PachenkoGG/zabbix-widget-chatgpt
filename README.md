@@ -39,15 +39,15 @@ Advanced AI-powered chat widget for Zabbix dashboards with multiple OpenAI model
 
 ## Installation
 
-1. Copy the `zabbix-widget` folder to your Zabbix modules directory:
+1. Copy the `zabbix-widget-chatgpt` folder to your Zabbix modules directory:
    ```bash
-   cp -r zabbix-widget /usr/share/zabbix/modules/
+   cp -r zabbix-widget-chatgpt /usr/share/zabbix/modules/
    ```
 
 2. Set proper permissions:
    ```bash
-   chown -R www-data:www-data /usr/share/zabbix/modules/zabbix-widget
-   chmod -R 755 /usr/share/zabbix/modules/zabbix-widget
+   chown -R www-data:www-data /usr/share/zabbix/modules/zabbix-widget-chatgpt
+   chmod -R 755 /usr/share/zabbix/modules/zabbix-widget-chatgpt
    ```
 
 3. Restart Zabbix frontend service:

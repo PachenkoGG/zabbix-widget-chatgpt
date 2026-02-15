@@ -159,8 +159,9 @@ sudo ./install.sh
 
 ### 2. Manuel
 ```bash
-sudo cp -r zabbix-widget /usr/share/zabbix/modules/openai-assistant
+sudo cp -r zabbix-widget-chatgpt /usr/share/zabbix/modules/openai-assistant
 sudo chown -R www-data:www-data /usr/share/zabbix/modules/openai-assistant
+sudo chmod -R 755 /usr/share/zabbix/modules/openai-assistant
 sudo systemctl restart zabbix-server
 ```
 
