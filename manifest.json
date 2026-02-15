@@ -29,7 +29,6 @@
         ],
         "js": [
             "marked.min.js",
-            "chart-helper.js",
             "class.widget.js"
         ]
     }

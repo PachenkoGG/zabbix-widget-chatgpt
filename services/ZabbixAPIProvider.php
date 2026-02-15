@@ -185,97 +185,6 @@ class ZabbixAPIProvider
     }
     
     /**
-     * Get item graph URL
-     */
-    public function getItemGraphUrl($itemId, $period = 172800, $width = 900, $height = 200) {
-        // Parse API URL to get base Zabbix URL
-        $urlParts = parse_url($this->apiUrl);
-        $baseUrl = $urlParts['scheme'] . '://' . $urlParts['host'];
-        if (isset($urlParts['port'])) {
-            $baseUrl .= ':' . $urlParts['port'];
-        }
-        
-        // Construct chart URL
-        $chartUrl = $baseUrl . '/chart.php';
-        $params = [
-            'itemids[]' => $itemId,
-            'period' => $period,
-            'width' => $width,
-            'height' => $height
-        ];
-        
-        return $chartUrl . '?' . http_build_query($params);
-    }
-    
-    /**
-     * Get graphs for host with key metrics
-     */
-    public function getHostGraphs($hostName, $period = 172800) {
-        try {
-            $metrics = $this->getHostMetrics($hostName, 20);
-            
-            if (isset($metrics['error'])) {
-                return ['error' => $metrics['error']];
-            }
-            
-            $graphs = [];
-            
-            // Find key metrics (CPU, Memory, Disk, Network)
-            foreach ($metrics['items'] as $item) {
-                $key = strtolower($item['key_']);
-                $name = strtolower($item['name']);
-                
-                // CPU metrics
-                if (stripos($key, 'cpu') !== false || stripos($name, 'cpu') !== false) {
-                    $graphs['cpu'][] = [
-                        'name' => $item['name'],
-                        'url' => $this->getItemGraphUrl($item['itemid'], $period),
-                        'value' => $item['lastvalue'],
-                        'units' => $item['units']
-                    ];
-                }
-                // Memory metrics
-                elseif (stripos($key, 'memory') !== false || stripos($name, 'memory') !== false || stripos($name, 'ram') !== false) {
-                    $graphs['memory'][] = [
-                        'name' => $item['name'],
-                        'url' => $this->getItemGraphUrl($item['itemid'], $period),
-                        'value' => $item['lastvalue'],
-                        'units' => $item['units']
-                    ];
-                }
-                // Disk metrics
-                elseif (stripos($key, 'disk') !== false || stripos($name, 'disk') !== false || stripos($name, 'storage') !== false) {
-                    $graphs['disk'][] = [
-                        'name' => $item['name'],
-                        'url' => $this->getItemGraphUrl($item['itemid'], $period),
-                        'value' => $item['lastvalue'],
-                        'units' => $item['units']
-                    ];
-                }
-                // Network metrics
-                elseif (stripos($key, 'net') !== false || stripos($name, 'network') !== false || stripos($name, 'traffic') !== false) {
-                    $graphs['network'][] = [
-                        'name' => $item['name'],
-                        'url' => $this->getItemGraphUrl($item['itemid'], $period),
-                        'value' => $item['lastvalue'],
-                        'units' => $item['units']
-                    ];
-                }
-            }
-            
-            return [
-                'host' => $metrics['host'],
-                'graphs' => $graphs,
-                'period_days' => $period / 86400
-            ];
-            
-        } catch (\Exception $e) {
-            error_log('ZabbixAPIProvider::getHostGraphs error: ' . $e->getMessage());
-            return ['error' => $e->getMessage()];
-        }
-    }
-    
-    /**
      * Get top hosts by specific metric (CPU, Memory, etc.)
      */
     public function getTopHosts($limit = 10) {
@@ -444,13 +353,8 @@ class ZabbixAPIProvider
             }
             
             $context .= "\n=== END ZABBIX STATUS ===\n";
-            $context .= "\n**Available Capabilities:**\n";
-            $context .= "- You can show Zabbix metric graphs using markdown image syntax\n";
-            $context .= "- Graph URL format: `http://ZABBIX_URL/chart.php?itemids[]=ITEM_ID&period=SECONDS&width=800&height=200`\n";
-            $context .= "- To show a graph, use: `![Graph Name](GRAPH_URL)`\n";
-            $context .= "- Common periods: 3600 (1h), 86400 (1d), 172800 (2d), 604800 (7d)\n";
-            $context .= "- If user asks for graphs, tell them graphs require authentication and may not display directly\n";
-            $context .= "- You can provide instructions on how to view graphs in Zabbix UI instead\n";
+            $context .= "\nNote: You can answer questions about specific hosts, their metrics, problems, and overall infrastructure status.\n";
+            $context .= "If user asks for a specific host's metrics, tell them the available data above or that you need more specific information.\n";
             
             return $context;
             
