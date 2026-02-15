@@ -230,7 +230,6 @@ class ZabbixAPIProvider
             $hosts = $this->apiRequest('host.get', [
                 'output' => ['hostid', 'host', 'name'],
                 'monitored_hosts' => true,
-                'selectItems' => ['itemid', 'name', 'key_', 'lastvalue', 'units'],
                 'limit' => $limit
             ]);
             
@@ -242,9 +241,23 @@ class ZabbixAPIProvider
                 $metrics = [];
                 
                 error_log("Host: {$host['name']} ({$host['host']})");
-                error_log("Total items: " . count($host['items']));
                 
-                foreach ($host['items'] as $item) {
+                // Get items directly for this host (not through selectItems)
+                $items = $this->apiRequest('item.get', [
+                    'output' => ['itemid', 'name', 'key_', 'lastvalue', 'units'],
+                    'hostids' => $host['hostid'],
+                    'monitored' => true,
+                    'search' => [
+                        'key_' => ['cpu', 'memory', 'vfs.fs', 'net']
+                    ],
+                    'searchByAny' => true,
+                    'sortfield' => 'name',
+                    'limit' => 100
+                ]);
+                
+                error_log("Total items: " . count($items));
+                
+                foreach ($items as $item) {
                     $key = $item['key_'];
                     $name = strtolower($item['name']);
                     
@@ -288,20 +301,20 @@ class ZabbixAPIProvider
                         }
                     }
                     
-                    // Disk metrics - prefer usage/utilization
+                    // Disk metrics - prefer usage/utilization for / filesystem
                     if (!isset($metrics['disk'])) {
-                        if (stripos($key, 'disk') !== false || stripos($key, 'vfs.fs') !== false || 
-                            stripos($name, 'disk') !== false || stripos($name, 'space') !== false) {
-                            // Prioritize: "used" or "utilization" over "free"/"available"
-                            if (stripos($name, 'utilization') !== false || 
-                                stripos($name, 'used') !== false ||
-                                stripos($name, 'usage') !== false) {
+                        if (stripos($key, 'vfs.fs') !== false || stripos($name, 'space') !== false) {
+                            // Look for "/" filesystem and "used" or "utilization"
+                            if ((stripos($name, 'fs /') !== false || stripos($name, 'fs/') !== false || stripos($key, '[/,') !== false || stripos($key, '[/]') !== false) &&
+                                (stripos($name, 'used') !== false || stripos($name, 'utilization') !== false) &&
+                                stripos($name, 'inode') === false) { // Exclude inode metrics
                                 $metrics['disk'] = [
                                     'itemid' => $item['itemid'],
                                     'name' => $item['name'],
                                     'value' => $item['lastvalue'],
                                     'units' => $item['units']
                                 ];
+                                error_log("  -> Selected Disk: {$item['name']}");
                             }
                         }
                     }
